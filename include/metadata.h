@@ -34,7 +34,7 @@ struct superBloque{
 
 struct inodo{
 	unsigned int tipo;							//Si es fichero o directorio
-	char name[TAMANO_NOMBRE_FICHERO + 1];		//Tamaño máximo de nombre
+	char nombre[TAMANO_NOMBRE_FICHERO + 1];		//Tamaño máximo de nombre
 	unsigned int tamano;						//Tamaño del fichero en bytes
 	unsigned int bloqueDirecto;					//Número del bloque directo
 	char relleno[PADDING_INODO];				//Relleno para completar bloque

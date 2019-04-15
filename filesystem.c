@@ -5,6 +5,11 @@
  * @brief 	Implementation of the core file system funcionalities and auxiliary functions.
  * @date	01/03/2017
  */
+#include <stdlib.h>
+#include <strings.h>
+#include <string.h>
+#include <stdint.h>
+#include <stdio.h>
 
 #include "include/filesystem.h" // Headers for the core functionality
 #include "include/auxiliary.h"  // Headers for auxiliary functions
@@ -129,4 +134,98 @@ int rmDir(char *path)
 int lsDir(char *path, int inodesDir[10], char namesDir[10][33])
 {
 	return -2;
+}
+
+int ialloc()
+{
+	int i;
+	//Recorrer inodos hasta encontrar uno vacio
+	for(i = 0; i < superBloque->numeroInodos; i++){
+		//Si el valor es 0, hemos encontrado uno vacio
+		if(mapasBits->mapaInodos[i] == 0){
+			//Para indicar que esta en uso le asignamos valor
+			mapasBits->mapaInodos[i] = 1;
+			return i;
+		}
+	}
+
+	//No se ha encontrado un inodo libre
+	return -1;
+}
+
+int ifree(int i)
+{
+	if(i > superBloque->numeroInodos || i < 0){
+		//printf("[ERROR] Indice de inodo erroneo\n");
+		return -1;
+	}
+
+	bzero(inodos[i].inodo.nombre, TAMANO_NOMBRE_FICHERO);
+	mapasBits->mapaInodos[i] = 0;
+
+	return 0;
+}
+
+// Busca un bloque libre, -1 si no hay libres
+int balloc()
+{
+	int i;
+	//Recorrer el mapa de los bloques hasta encontrar uno libre
+	for(i = 0; i < superBloque->numeroBloquesDatos; i++){
+		if(mapasBits->mapaBloquesDatos[i] == 0){
+			mapasBits->mapaBloquesDatos[i] = 1;
+			return i;
+		}
+	}
+	// No se ha enciontrado uno libre
+	return -1;
+}
+
+// Libera un bloque
+int bfree(int i)
+{
+	char buffer[TAMANO_BLOQUE];
+
+	if(i < 0 || i > superBloque->numeroBloquesDatos){
+		//printf("[ERROR] Indice de bloque erroneo\n");
+		return -1;
+	}
+
+	bzero(buffer, TAMANO_BLOQUE);
+	if(bwrite(DEVICE_IMAGE, (i + superBloque->primerBloqueDatos), buffer) == -1){
+		//printf("[ERROR] No se ha encontrado el bloque\n");
+		return -1;
+	}
+	mapasBits->mapaBloquesDatos[i] = 0;
+	return 0;
+}
+
+int namei(char *name)
+{
+	int i;
+	// buscar i-nodo con nombre <name>
+	for (i = 0; i < superBloque->numeroInodos; i++){
+		if(!strcmp(inodos[i].inodo.nombre, name)){
+			return i;
+		}
+	}
+	//Si no lo encuentra retorna -1
+	//printf("[ERROR] Inodo no encontrado \n")
+	return -1;
+}
+
+int bmap(int inodo_id, int offset)
+{
+	//Comprobamos que el id el inodo sea válido y el offset también
+	if( (inodo_id > superBloque->numeroInodos) || (inodo_id<0) || (offset < 0) ){
+		//printf("[ERROR] Id del nodo no es válido. No se puede localizar el bloque de datos \n");
+		return -1;
+	}
+
+	//Retorna el bloque de inodo
+	if(offset < BLOCK_SIZE){
+		return inodos[inodo_id].inodo.bloqueDirecto;
+	}
+
+	return -1;
 }
