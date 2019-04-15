@@ -10,6 +10,10 @@
 #include "include/auxiliary.h"  // Headers for auxiliary functions
 #include "include/metadata.h"   // Type and structure declaration of the file system
 
+struct superBloque *superBloque;
+struct mapasBits *mapasBits;
+struct inodoMemoria inodos[MAX_FICHEROS];
+
 /*
  * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
  * @return 	0 if success, -1 otherwise.
