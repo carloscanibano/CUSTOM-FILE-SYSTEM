@@ -28,7 +28,7 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
 #define BLOQUE_PRIMER_INODO 5
 #define BLOQUE_BITS_INODOS 3
 #define BLOQUE_BITS_DATOS 4
-#define TAMANO_INODOS ((unsigned int) (ceil((sizeof(struct inodo) * MAX_FICHEROS) / BLOCK_SIZE)))
+#define TAMANO_INODOS ((int) (ceil((((double)(sizeof(struct inodo) * MAX_FICHEROS))) / BLOCK_SIZE)))
 
 struct superBloque{
 	unsigned int numeroMagico;				//Número de superbloque
