@@ -19,6 +19,8 @@ struct superBloque *superBloque;
 struct mapasBits *mapasBits;
 struct inodoMemoria *inodosMemoria;
 struct inodo *inodosDisco;
+//Descriptor es el indice y inodo es el valor guardado
+int estadoFicheros[MAX_FICHEROS];
 
 /*
  * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
@@ -71,6 +73,10 @@ int mountFS(void)
 	char buferLecturaMapaBitsDatos[BLOCK_SIZE];
 	char buferLecturaInodos[MAX_FICHEROS];
 
+	for(int i = 0; i < MAX_FICHEROS; i++){
+		estadoFicheros[i] = -1;
+	}
+
 	//Asignar memoria a los inodos
 	inodosMemoria = malloc((sizeof(struct inodoMemoria) * MAX_FICHEROS));
 
@@ -104,6 +110,7 @@ int mountFS(void)
 	for(int i = 0; i < MAX_FICHEROS; i++){
 		//Los inodos son consecutivos en memoria
 		memcpy(in, buferLecturaInodos + (sizeof(struct inodo) * i), sizeof(struct inodo));
+		inodosMemoria[i].indice = i;
 		inodosMemoria[i].inodo = in;
 	}
 
@@ -139,11 +146,14 @@ int unmountFS(void)
 		return -1;
 	}
 
+	//TO-DO: Recorrer estados ficheros para cerrar todos los ficheros abiertos
+
 	//Liberamos recursos
 	free(superBloque);
 	free(mapasBits);
 	free(inodosDisco);
 	free(inodosMemoria);
+
 
 	return 0;
 }
@@ -154,6 +164,7 @@ int unmountFS(void)
  */
 int createFile(char *path)
 {
+
 	return -2;
 }
 
@@ -181,7 +192,19 @@ int openFile(char *path)
  */
 int closeFile(int fileDescriptor)
 {
-	return -1;
+	if (fileDescriptor < 0 || fileDescriptor >= MAX_FICHEROS){
+		printf("[ERROR] No se puede cerrar el fichero %d. Descriptor no valido\n", fileDescriptor);
+		return -1;
+	}
+
+	if(inodosMemoria[fileDescriptor].estado == CERRADO){
+		printf("[ERROR] No se puede cerrar el fichero %d. Ya esta cerrado\n", fileDescriptor);
+		return -1;
+	}
+
+	inodosMemoria[fileDescriptor].estado = CERRADO;
+
+return 0;
 }
 
 /*
@@ -190,7 +213,47 @@ int closeFile(int fileDescriptor)
  */
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
-	return -1;
+	int resul;
+
+	//Comprobar errores
+	if(numBytes > TAMANO_BLOQUE || numBytes < 0){
+		printf("[ERROR] Numero de bytes a leer fuera de limites\n");
+		return -1;
+	}
+
+	if(fileDescriptor > MAX_FICHEROS || fileDescriptor < 0 || estadoFicheros[fileDescriptor] == -1){
+		printf("[ERROR] Descriptor de fichero no existente\n");
+		return -1;
+	}
+	//Buscamos el inodo para obtener posicion
+	struct inodoMemoria *inodo = NULL;
+	for(int i = 0; i < MAX_FICHEROS; i++){
+		if(estadoFicheros[fileDescriptor] == inodosMemoria[i].indice){
+			inodo = &inodosMemoria[i];
+		}
+	}
+	//Posicion a partir de la cual tenemos que leer
+	char *buferLectura = malloc(sizeof(char) * (numBytes - inodo->posicion));
+	if (inodo->posicion >= BLOCK_SIZE - 1){
+		free(buferLectura);
+		return 0;
+	}
+	//Leemos del sistema de ficheros
+	resul = bread(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferLectura);
+	if(resul == -1){
+		free(buferLectura);
+		printf("[ERROR] No se puede leer del fichero\n");
+		return -1;
+	}
+	//Si nos salimos de nuestro bloque, el fin del bloque es nuestra posicion
+	if(numBytes > BLOCK_SIZE - inodo->posicion){
+		numBytes = (BLOCK_SIZE - inodo->posicion);
+	}
+	memcpy(buffer, buferLectura, resul);
+	inodo->posicion += resul;
+	free(buferLectura);
+
+	return resul;
 }
 
 /*
@@ -208,7 +271,36 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int lseekFile(int fileDescriptor, long offset, int whence)
 {
-	return -1;
+
+	if (fileDescriptor >= MAX_FICHEROS|| fileDescriptor < 0){
+		printf("[ERROR] No se puede modificar el puntero de busqueda. Descriptor de fichero invalido\n");
+		return -1;
+	}
+	if(inodosMemoria[fileDescriptor].estado == CERRADO){
+		printf("[ERROR] No se puede modificar el puntero de busqueda. El archivo esta cerrado\n");
+		return -1;
+	}
+
+	int nuevaPosicion = inodosMemoria[fileDescriptor].posicion + offset;
+	switch (whence) {
+		case FS_SEEK_CUR:
+			if (nuevaPosicion < 0 || nuevaPosicion > inodosMemoria[fileDescriptor].inodo->tamano)
+				return -1;
+			else inodosMemoria[fileDescriptor].posicion = nuevaPosicion;
+		break;
+
+		case FS_SEEK_END:
+			inodosMemoria[fileDescriptor].posicion = inodosMemoria[fileDescriptor].inodo->tamano;
+		break;
+
+		case FS_SEEK_BEGIN:
+			inodosMemoria[fileDescriptor].posicion = 0;
+		break;
+
+		default: return -1;
+	}
+
+	return 0;
 }
 
 /*

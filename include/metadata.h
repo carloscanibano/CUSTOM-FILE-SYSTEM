@@ -17,9 +17,8 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
 }
 
 #define TAMANO_BLOQUE 2048 
-#define PADDING_SB (TAMANO_BLOQUE - (4 * 8))
+#define PADDING_SB (TAMANO_BLOQUE - 8 * sizeof(unsigned int))
 #define TAMANO_NOMBRE_FICHERO 32
-#define PADDING_INODO (TAMANO_BLOQUE - (3 * 4 + TAMANO_NOMBRE_FICHERO + 1))
 #define MAX_FICHEROS 40
 #define MAX_TAMANO_DISCO 10E20
 #define MIN_TAMANO_DISCO 50E10
@@ -29,6 +28,11 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
 #define BLOQUE_BITS_INODOS 3
 #define BLOQUE_BITS_DATOS 4
 #define TAMANO_INODOS ((int) (ceil((((double)(sizeof(struct inodo) * MAX_FICHEROS))) / BLOCK_SIZE)))
+//Referente a los estados de inodos y tipos
+#define FICHERO 0
+#define DIRECTORIO 1
+#define CERRADO 0
+#define ABIERTO 1
 
 struct superBloque{
 	unsigned int numeroMagico;				//Número de superbloque
@@ -39,7 +43,7 @@ struct superBloque{
 	unsigned int numeroBloquesDatos;		//Número de bloques de datos
 	unsigned int primerBloqueDatos;			//Número del primer bloque de datos
 	unsigned int tamanoDispositivo;			//Tamaño total del dispositivo 
-	//char relleno[PADDING_SB];				//Campo de relleno (para complear bloque)
+	char relleno[PADDING_SB];				//Campo de relleno (para complear bloque)
 };
 
 struct inodo{
@@ -47,16 +51,17 @@ struct inodo{
 	char nombre[TAMANO_NOMBRE_FICHERO + 1];		//Tamaño máximo de nombre
 	unsigned int tamano;						//Tamaño del fichero en bytes
 	unsigned int bloqueDirecto;					//Número del bloque directo
-	//char relleno[PADDING_INODO];				//Relleno para completar bloque
 };
 
 struct mapasBits{
-	unsigned char mapaInodos[MAX_FICHEROS/8];			//Mapa de bits de los inodos
-	unsigned char mapaBloquesDatos[MAX_FICHEROS/8];		//Mapa de bits de los bloques
-	//char relleno[TAMANO_BLOQUE*8-(2*MAX_FICHEROS*8)];	//Relleno para mapa de bits
+	unsigned char mapaInodos[MAX_FICHEROS/sizeof(unsigned char)];			//Mapa de bits de los inodos
+	unsigned char mapaBloquesDatos[MAX_FICHEROS/sizeof(unsigned char)];		//Mapa de bits de los bloques
+	//Relleno para mapa de bits
+	char relleno[TAMANO_BLOQUE - 2 * (sizeof(unsigned char) * (MAX_FICHEROS / sizeof(unsigned char)))];		
 };
 
 struct inodoMemoria{
+	unsigned int indice;		//Indice del inodo contenido
 	unsigned int posicion;		//Posicion del puntero de fichero
 	unsigned int estado;		//Abierto o cerrado
 	struct inodo *inodo; 		//Inodo seleccionado
