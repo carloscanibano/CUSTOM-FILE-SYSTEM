@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "include/filesystem.h"
+#include "include/metadata.h"
+#include <math.h>
 
 // Color definitions for asserts
 #define ANSI_COLOR_RESET "\x1b[0m"
@@ -20,7 +22,16 @@
 #define DEV_SIZE N_BLOCKS *BLOCK_SIZE // Device size, in bytes
 
 int main()
-{
+{	
+	double a = sizeof(struct inodo);
+	double b = a * MAX_FICHEROS;
+	double c = b / BLOCK_SIZE;
+	printf("%d\n", BLOCK_SIZE);
+	printf("%f\n", a);
+	printf("%f\n", b);
+	printf("%f\n", c);
+
+	/*
 	int ret;
 
 	///////
@@ -64,6 +75,7 @@ int main()
 	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST unmountFS ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 
 	///////
+	*/
 
 	return 0;
 }
