@@ -115,8 +115,7 @@ int mountFS(void)
 		printf("[ERROR] No se pudo leer el superbloque\n");
 		return -1;
 	}
-	//printf("Escribo el SB:\nmagico=%u, numeroBloquesMapaInodos=%u, numeroBloquesMapaDatos=%u, numeroInodos=%u, primerInodo=%u, primerBloqueDatos=%u, numeroBloquesDatos=%u, tamanoDispositivo=%u B\n", superBloque->numeroMagico, superBloque->numeroBloquesMapaInodos, superBloque->numeroBloquesMapaDatos, superBloque->numeroInodos, superBloque->primerInodo, superBloque->primerBloqueDatos, superBloque->numeroBloquesDatos, superBloque->tamanoDispositivo);
-
+	//printf("Leo el SB:\nmagico=%u, numeroBloquesMapaInodos=%u, numeroBloquesMapaDatos=%u, numeroInodos=%u, primerInodo=%u, primerBloqueDatos=%u, numeroBloquesDatos=%u, tamanoDispositivo=%u B\n", superBloque->numeroMagico, superBloque->numeroBloquesMapaInodos, superBloque->numeroBloquesMapaDatos, superBloque->numeroInodos, superBloque->primerInodo, superBloque->primerBloqueDatos, superBloque->numeroBloquesDatos, superBloque->tamanoDispositivo);
 
 	mapaBitsInodos = malloc(TAMANO_BLOQUE);
 	mapaBitsBloquesDatos = malloc(TAMANO_BLOQUE);
@@ -394,8 +393,28 @@ int rmDir(char *path)
  * @return	The number of items in the directory, -1 if the directory does not exist, -2 in case of error..
  */
 int lsDir(char *path, int inodesDir[10], char namesDir[10][33])
-{
+{	
+	lsDir(0, inodesDir, namesDir);
+	for(int i = 0; i < 10; i++){
+	}
 	return -2;
+}
+
+//Acorta en un nivel la ruta proporcionada y retorna el primer elemento
+void trocearRuta(char **path, char **profundidadSuperior)
+{
+	//Creamos datos adicionales para sacar los tokens
+	char *rutaTroceada = malloc(strlen(*path));
+	char copia[strlen(*path)];
+	char *ptr = NULL;
+	strcpy(copia, *path);
+	//Especificamos como separadores el espacio y el \n
+	ptr = strtok(copia, "/");
+	//Eliminamos un nivel de profundidad de la ruta
+	memcpy(rutaTroceada, *path + strlen(ptr) + 1, strlen(*path) - strlen(ptr));
+	*path = rutaTroceada;
+	strcpy(*profundidadSuperior, ptr);
+	return;
 }
 
 void set_bit(bits *words, int n) {
@@ -535,8 +554,8 @@ int bmap(int inodo_id, int offset)
 
 	return -1;
 }
-/*
-void listarInodo(int in, int listaInodos[10], char listaNombres[10][33])
+
+void lsInodo(int in, int listaInodos[10], char listaNombres[10][33])
 {
 	//Creamos el bufer de lectura
 	char *buferLectura = malloc(sizeof(char) * BLOCK_SIZE);
@@ -546,18 +565,33 @@ void listarInodo(int in, int listaInodos[10], char listaNombres[10][33])
 		return;
 	}
 	//Creamos datos adicionales para sacar los tokens
+	int contador = 0;
+	int contadorInodos = 0;
+	int contadorNombres = 0;
 	char copia[256];
-	char ultimoFichero[33];
-	char *ptrEspacio;
-	char *ptrN;
+	char *ptr;
 	strcpy(copia, buferLectura);
-	ptrN = strtok(copia, "\n");
-	strcpy(ultimoFichero, ptrN);
-	while(ptrN != NULL){
-		while(ptrEspacio != NULL){
-
+	//Especificamos como separadores el espacio y el \n
+	ptr = strtok(copia, " \n");
+	while(ptr != NULL){
+		//Los fragmentos pares siempre son el numero de inodo
+		if(contador % 2 == 0){
+			listaInodos[contadorInodos] = atoi(ptr);
+			contadorInodos++;
+		//Los fragmentos impares siempre son el nombre del fichero/directorio
+		}else{
+			strcpy(listaNombres[contadorNombres], ptr);
+			contadorNombres++;
 		}
-		strtok
+		ptr = strtok(NULL, " \n");
+		contador++;
 	}
+	//Rellenamos el resto de casillas de las listas con -1 y con "" respectivamente
+	for(int i = contador/2; i < 10; i++){
+		listaInodos[i] = -1;
+		strcpy(listaNombres[i], "");
+	}
+	//Liberamos el bufer de lectura
+	free(buferLectura);
+	return;
 }
-*/
