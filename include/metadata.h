@@ -16,17 +16,20 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
     bitmap_[(i_ >> 3)] &= ~(1 << (i_ & 0x07));
 }
 
-#define TAMANO_BLOQUE 2048 
+#define TAMANO_BLOQUE 2048
 #define PADDING_SB (TAMANO_BLOQUE - 8 * sizeof(unsigned int))
 #define TAMANO_NOMBRE_FICHERO 32
 #define MAX_FICHEROS 40
-#define MAX_TAMANO_DISCO 10E20
-#define MIN_TAMANO_DISCO 50E10
+#define MIN_TAMANO_DISCO 50*1024// 50 KiB
+#define MAX_TAMANO_DISCO 10*1024*1024// 10 MiB
 //Numeros de bloque correspondientes al diseno
 #define BLOQUE_SUPERBLOQUE 0
-#define BLOQUE_PRIMER_INODO 5
-#define BLOQUE_BITS_INODOS 3
-#define BLOQUE_BITS_DATOS 4
+#define BLOQUE_BITS_INODOS 1
+#define BLOQUE_BITS_INODOS_NUM 1
+#define BLOQUE_BITS_DATOS 2
+#define BLOQUE_BITS_DATOS_NUM 1
+#define BLOQUE_PRIMER_INODO 3
+#define BLOQUE_PRIMER_DATOS 4
 #define TAMANO_INODOS ((int) (ceil((((double)(sizeof(struct inodo) * MAX_FICHEROS))) / BLOCK_SIZE)))
 //Referente a los estados de inodos y tipos
 #define FICHERO 0
@@ -42,19 +45,19 @@ struct superBloque{
 	unsigned int primerInodo;				//Número del primer inodo en el sistema
 	unsigned int numeroBloquesDatos;		//Número de bloques de datos
 	unsigned int primerBloqueDatos;			//Número del primer bloque de datos
-	unsigned int tamanoDispositivo;			//Tamaño total del dispositivo 
+	unsigned int tamanoDispositivo;			//Tamaño total del dispositivo
 	char relleno[PADDING_SB];				//Campo de relleno (para complear bloque)
 };
 
 struct inodo{
-	unsigned int tipo;							//Si es fichero o directorio
+	unsigned char tipo;							//Si es fichero o directorio
 	char nombre[TAMANO_NOMBRE_FICHERO + 1];		//Tamaño máximo de nombre
 	unsigned int tamano;						//Tamaño del fichero en bytes
 	unsigned int bloqueDirecto;					//Número del bloque directo
 };
 
 struct inodoMemoria{
-	unsigned int indice;		//Indice del inodo contenido
+	//unsigned int indice;		//Indice del inodo contenido
 	unsigned int posicion;		//Posicion del puntero de fichero
 	unsigned int estado;		//Abierto o cerrado
 	struct inodo *inodo; 		//Inodo seleccionado
@@ -95,4 +98,3 @@ struct mapaBitsBloquesDatos{
 	//Relleno para mapa de bits
 	char relleno[TAMANO_BLOQUE - (sizeof(bits) * NUM_PALABRAS)];
 };
-
