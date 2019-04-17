@@ -53,17 +53,46 @@ struct inodo{
 	unsigned int bloqueDirecto;					//Número del bloque directo
 };
 
-struct mapasBits{
-	unsigned char mapaInodos[MAX_FICHEROS/sizeof(unsigned char)];			//Mapa de bits de los inodos
-	unsigned char mapaBloquesDatos[MAX_FICHEROS/sizeof(unsigned char)];		//Mapa de bits de los bloques
-	//Relleno para mapa de bits
-	char relleno[TAMANO_BLOQUE - 2 * (sizeof(unsigned char) * (MAX_FICHEROS / sizeof(unsigned char)))];		
-};
-
 struct inodoMemoria{
 	unsigned int indice;		//Indice del inodo contenido
 	unsigned int posicion;		//Posicion del puntero de fichero
 	unsigned int estado;		//Abierto o cerrado
 	struct inodo *inodo; 		//Inodo seleccionado
+};
+
+//Mapas de bits
+// TO-DO: meter en la memoria referencia a https://stackoverflow.com/questions/1225998/what-is-a-bitmap-in-c
+#include <limits.h> // para CHAR_BIT (cantidad de bits en un char/byte)
+
+typedef unsigned char bits;
+#define NUM_BITS (sizeof(bits) * CHAR_BIT)
+#define NUM_PALABRAS (MAX_FICHEROS/sizeof(bits))
+
+// Macros y funciones para el manejo
+#define WORD_OFFSET(b) ((b) / NUM_BITS)
+#define BIT_OFFSET(b)  ((b) % NUM_BITS)
+void set_bit(bits *words, int n);// Pone el bit n a 1
+void clear_bit(bits *words, int n);// Pone el bit n a 0
+int get_bit(bits *words, int n);// Devuelve el bit n
+void printBits(bits num);// Imprime los bits
+// Devuelve los indices de los bits del num
+struct indices_bits get_indices_bits(int num);
+// Devuelve el indice de los indices de los bits
+int get_num_indices(struct indices_bits);
+
+struct indices_bits{
+	// a es el indice del array del mapa y b el del elemento
+    int a, b;
+};
+
+struct mapaBitsInodos{
+	bits mapa[NUM_PALABRAS];
+	//Relleno para mapa de bits
+	char relleno[TAMANO_BLOQUE - (sizeof(bits) * NUM_PALABRAS)];
+};
+struct mapaBitsBloquesDatos{
+	bits mapa[NUM_PALABRAS];
+	//Relleno para mapa de bits
+	char relleno[TAMANO_BLOQUE - (sizeof(bits) * NUM_PALABRAS)];
 };
 

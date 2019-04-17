@@ -12,3 +12,4 @@ int balloc();
 int bfree(int b);
 int namei(char *name);
 int bmap(int i, int offset);
+struct inodoMemoria* buscarInodo(char *path);
