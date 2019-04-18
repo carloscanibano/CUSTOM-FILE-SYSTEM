@@ -22,6 +22,7 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
 #define MAX_FICHEROS 40
 #define MIN_TAMANO_DISCO 50*1024// 50 KiB
 #define MAX_TAMANO_DISCO 10*1024*1024// 10 MiB
+#define NUM_MAGICO 0xAAFF8023// TO-DO
 //Numeros de bloque correspondientes al diseno
 #define BLOQUE_SUPERBLOQUE 0
 #define BLOQUE_BITS_INODOS 1
@@ -87,6 +88,9 @@ struct indices_bits{
 	// a es el indice del array del mapa y b el del elemento
     int a, b;
 };
+
+// Usaremos el PALABRAS_SYNC para crear el mapa de bits del metodo sincronizarDisco
+#define PALABRAS_SYNC ((unsigned int)(ceil((double)BLOQUE_PRIMER_DATOS/(double)CHAR_BIT)))
 
 struct mapaBitsInodos{
 	bits mapa[NUM_PALABRAS];

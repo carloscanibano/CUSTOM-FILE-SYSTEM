@@ -15,13 +15,92 @@
 #include "include/auxiliary.h"  // Headers for auxiliary functions
 #include "include/metadata.h"   // Type and structure declaration of the file system
 
-struct superBloque *superBloque;
-struct mapaBitsInodos *mapaBitsInodos;
-struct mapaBitsBloquesDatos *mapaBitsBloquesDatos;
-struct inodoMemoria *inodosMemoria;
-struct inodo *inodosDisco;
+struct superBloque *superBloque = NULL;
+struct mapaBitsInodos *mapaBitsInodos = NULL;
+struct mapaBitsBloquesDatos *mapaBitsBloquesDatos = NULL;
+struct inodo *inodosDisco = NULL;
+struct inodoMemoria *inodosMemoria = NULL;
 //Descriptor es el indice y inodo es el valor guardado
 int estadoFicheros[MAX_FICHEROS];
+// Para saber si es necesario guardar en disco tenemos un mapa de bits, 1 significa que esta desactualizado
+unsigned char *mapaSync = NULL;
+// Guarda en disco los bloques iniciales si es necesario
+int sincronizarDisco() {
+	struct indices_bits ib;
+
+	ib=get_indices_bits(BLOQUE_SUPERBLOQUE);
+	if (mapaSync != NULL && get_bit(&mapaSync[ib.a], ib.b) == 1) {
+		// SuperBloque
+		//printf("Escribo el SB:\nmagico=%u, numeroBloquesMapaInodos=%u, numeroBloquesMapaDatos=%u, numeroInodos=%u, primerInodo=%u, primerBloqueDatos=%u, numeroBloquesDatos=%u, tamanoDispositivo=%u B\n", superBloque->numeroMagico, superBloque->numeroBloquesMapaInodos, superBloque->numeroBloquesMapaDatos, superBloque->numeroInodos, superBloque->primerInodo, superBloque->primerBloqueDatos, superBloque->numeroBloquesDatos, superBloque->tamanoDispositivo);
+		if(bwrite(DEVICE_IMAGE, BLOQUE_SUPERBLOQUE, (char *) superBloque) == -1){
+			printf("[ERROR] No se puede guardar el mapa de bits de datos\n");
+			return -1;
+		}
+	}
+	ib=get_indices_bits(BLOQUE_BITS_INODOS);
+	if (mapaSync != NULL && get_bit(&mapaSync[ib.a], ib.b) == 1) {
+		// Mapa de bits de inodos
+		if(bwrite(DEVICE_IMAGE, BLOQUE_BITS_INODOS, (char *) mapaBitsInodos->mapa) == -1){
+			printf("[ERROR] No se puede guardar el mapa de bits de inodos\n");
+			return -1;
+		}
+	}
+	ib=get_indices_bits(BLOQUE_BITS_DATOS);
+	if (mapaSync != NULL && get_bit(&mapaSync[ib.a], ib.b) == 1) {
+		// Mapa de bits de bloques de datos
+		if(bwrite(DEVICE_IMAGE, BLOQUE_BITS_DATOS, (char *) mapaBitsBloquesDatos->mapa) == -1){
+			printf("[ERROR] No se puede guardar el mapa de bits de datos\n");
+			return -1;
+		}
+	}
+	ib=get_indices_bits(BLOQUE_PRIMER_INODO);
+	if (mapaSync != NULL && get_bit(&mapaSync[ib.a], ib.b) == 1) {
+		//Guardamos los inodos
+		if(bwrite(DEVICE_IMAGE, BLOQUE_PRIMER_INODO, (char *) inodosDisco) == -1){
+			printf("[ERROR] No se pueden guardar los inodos\n");
+			return -1;
+		}
+	}
+
+	return 0;
+}
+// Lee de disco los bloques iniciales si es necesario
+int sincronizarMemoria() {
+	if (superBloque == NULL) {
+		superBloque = malloc(TAMANO_BLOQUE);
+		//Leer el superbloque
+		if(bread(DEVICE_IMAGE, BLOQUE_SUPERBLOQUE, (char *) superBloque) == -1){
+			printf("[ERROR] No se pudo leer el superbloque\n");
+			return -1;
+		}
+		//printf("Leo el SB:\nmagico=%u, numeroBloquesMapaInodos=%u, numeroBloquesMapaDatos=%u, numeroInodos=%u, primerInodo=%u, primerBloqueDatos=%u, numeroBloquesDatos=%u, tamanoDispositivo=%u B\n", superBloque->numeroMagico, superBloque->numeroBloquesMapaInodos, superBloque->numeroBloquesMapaDatos, superBloque->numeroInodos, superBloque->primerInodo, superBloque->primerBloqueDatos, superBloque->numeroBloquesDatos, superBloque->tamanoDispositivo);
+	}
+
+	if (mapaBitsInodos == NULL || mapaBitsBloquesDatos == NULL) {
+		mapaBitsInodos = malloc(TAMANO_BLOQUE);
+		mapaBitsBloquesDatos = malloc(TAMANO_BLOQUE);
+		//Leer mapas de bits
+		if(bread(DEVICE_IMAGE, BLOQUE_BITS_INODOS, (char *) mapaBitsInodos) == -1){
+			printf("[ERROR] No se pueden leer los mapas de bits de inodos\n");
+			return -1;
+		}
+		if(bread(DEVICE_IMAGE, BLOQUE_BITS_DATOS, (char *) mapaBitsBloquesDatos) == -1){
+			printf("[ERROR] No se pueden leer los mapas de bits de inodos\n");
+			return -1;
+		}
+	}
+
+	if (inodosDisco == NULL) {
+		inodosDisco = malloc(TAMANO_BLOQUE);
+		//Por ultimo debemos leer los inodos para traspasarlos a memoria
+		if(bread(DEVICE_IMAGE, BLOQUE_PRIMER_INODO, (char *) inodosDisco) == -1){
+			printf("[ERROR] Error al leer los inodos\n");
+			return -1;
+		}
+	}
+
+	return 0;
+}
 
 /*
  * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
@@ -46,57 +125,32 @@ int mkFS(long deviceSize)
 		}
 	}
 
-	struct superBloque *sb = malloc(sizeof(struct superBloque));
-	sb->numeroMagico = 0xAAFF8023;// TO-DO
-	sb->numeroBloquesMapaInodos = BLOQUE_BITS_INODOS_NUM;
-	sb->numeroBloquesMapaDatos = BLOQUE_BITS_DATOS_NUM;
-	sb->numeroInodos = MAX_FICHEROS;
-	sb->primerInodo = BLOQUE_PRIMER_INODO;
-	sb->primerBloqueDatos = BLOQUE_PRIMER_DATOS;
-	sb->numeroBloquesDatos = (unsigned int) (cant_bloques - BLOQUE_PRIMER_DATOS);
-	sb->tamanoDispositivo = deviceSize;
-
-	//printf("Escribo el SB:\nmagico=%u, numeroBloquesMapaInodos=%u, numeroBloquesMapaDatos=%u, numeroInodos=%u, primerInodo=%u, primerBloqueDatos=%u, numeroBloquesDatos=%u, tamanoDispositivo=%u B\n", sb->numeroMagico, sb->numeroBloquesMapaInodos, sb->numeroBloquesMapaDatos, sb->numeroInodos, sb->primerInodo, sb->primerBloqueDatos, sb->numeroBloquesDatos, sb->tamanoDispositivo);
-
-	if(bwrite(DEVICE_IMAGE, BLOQUE_SUPERBLOQUE, (char *) sb) == -1){
-		printf("[ERROR] No se puede guardar el mapa de bits de datos\n");
-		return -1;
-	}
-	free(sb);
+	superBloque = malloc(sizeof(struct superBloque));
+	superBloque->numeroMagico = NUM_MAGICO;
+	superBloque->numeroBloquesMapaInodos = BLOQUE_BITS_INODOS_NUM;
+	superBloque->numeroBloquesMapaDatos = BLOQUE_BITS_DATOS_NUM;
+	superBloque->numeroInodos = MAX_FICHEROS;
+	superBloque->primerInodo = BLOQUE_PRIMER_INODO;
+	superBloque->primerBloqueDatos = BLOQUE_PRIMER_DATOS;
+	superBloque->numeroBloquesDatos = (unsigned int) (cant_bloques - BLOQUE_PRIMER_DATOS);
+	superBloque->tamanoDispositivo = deviceSize;
 
 	//Creacion de las estructuras estáticas de disco
-	struct mapaBitsInodos *mbi = malloc(sizeof(struct mapaBitsInodos));
-	struct mapaBitsBloquesDatos *mbbd = malloc(sizeof(struct mapaBitsBloquesDatos));
+	mapaBitsInodos = malloc(sizeof(struct mapaBitsInodos));
+	mapaBitsBloquesDatos = malloc(sizeof(struct mapaBitsBloquesDatos));
 	// Reseteamos los bits del mapa
-	for (int i=0; i < NUM_PALABRAS; i++) mbi->mapa[i]=0;
-	for (int i=0; i < NUM_PALABRAS; i++) mbbd->mapa[i]=0;
+	for (int i=0; i < NUM_PALABRAS; i++) mapaBitsInodos->mapa[i]=0;
+	for (int i=0; i < NUM_PALABRAS; i++) mapaBitsBloquesDatos->mapa[i]=0;
 
-	//Guardamos el mapa de bits de inodos
-	if(bwrite(DEVICE_IMAGE, BLOQUE_BITS_INODOS, (char *) mbi->mapa) == -1){
-		printf("[ERROR] No se puede guardar el mapa de bits de inodos\n");
-		return -1;
-	}
-	//Guardamos el mapa de bits de bloques de datos
-	if(bwrite(DEVICE_IMAGE, BLOQUE_BITS_DATOS, (char *) mbbd->mapa) == -1){
-		printf("[ERROR] No se puede guardar el mapa de bits de datos\n");
-		return -1;
-	}
-	free(mbi);
-	free(mbbd);
-
-	struct inodo *inodos = malloc(sizeof(struct inodo) * MAX_FICHEROS);
+	inodosDisco = malloc(sizeof(struct inodo) * MAX_FICHEROS);
 	for (int i=0; i < MAX_FICHEROS; i++) {
-		inodos[i].tipo=FICHERO;
-		strcpy(inodos[i].nombre, "");
-		inodos[i].tamano=0;
+		inodosDisco[i].tipo=FICHERO;
+		strcpy(inodosDisco[i].nombre, "");
+		inodosDisco[i].tamano=0;
 	}
 
-	//Guardamos los inodos
-	if(bwrite(DEVICE_IMAGE, BLOQUE_PRIMER_INODO, (char *) inodos) == -1){
-		printf("[ERROR] No se pueden guardar los inodos\n");
-		return -1;
-	}
-	free(inodos);
+	// Guardamos a disco
+	if (sincronizarDisco() == -1) return -1;
 
 	return 0;
 
@@ -109,32 +163,7 @@ int mkFS(long deviceSize)
  */
 int mountFS(void)
 {
-	superBloque = malloc(TAMANO_BLOQUE);
-	//Leer el superbloque
-	if(bread(DEVICE_IMAGE, BLOQUE_SUPERBLOQUE, (char *) superBloque) == -1){
-		printf("[ERROR] No se pudo leer el superbloque\n");
-		return -1;
-	}
-	//printf("Leo el SB:\nmagico=%u, numeroBloquesMapaInodos=%u, numeroBloquesMapaDatos=%u, numeroInodos=%u, primerInodo=%u, primerBloqueDatos=%u, numeroBloquesDatos=%u, tamanoDispositivo=%u B\n", superBloque->numeroMagico, superBloque->numeroBloquesMapaInodos, superBloque->numeroBloquesMapaDatos, superBloque->numeroInodos, superBloque->primerInodo, superBloque->primerBloqueDatos, superBloque->numeroBloquesDatos, superBloque->tamanoDispositivo);
-
-	mapaBitsInodos = malloc(TAMANO_BLOQUE);
-	mapaBitsBloquesDatos = malloc(TAMANO_BLOQUE);
-	//Leer mapas de bits
-	if(bread(DEVICE_IMAGE, BLOQUE_BITS_INODOS, (char *) mapaBitsInodos) == -1){
-		printf("[ERROR] No se pueden leer los mapas de bits de inodos\n");
-		return -1;
-	}
-	if(bread(DEVICE_IMAGE, BLOQUE_BITS_DATOS, (char *) mapaBitsBloquesDatos) == -1){
-		printf("[ERROR] No se pueden leer los mapas de bits de inodos\n");
-		return -1;
-	}
-
-	inodosDisco = malloc(TAMANO_BLOQUE);
-	//Por ultimo debemos leer los inodos para traspasarlos a memoria
-	if(bread(DEVICE_IMAGE, BLOQUE_PRIMER_INODO, (char *) inodosDisco) == -1){
-		printf("[ERROR] Error al leer los inodos\n");
-		return -1;
-	}
+	if (sincronizarMemoria() == -1) return -1;
 
 	// Creamos los inodos de memoria
 	inodosMemoria = malloc((sizeof(struct inodoMemoria) * MAX_FICHEROS));
@@ -145,6 +174,27 @@ int mountFS(void)
 		//printf("indice=%d, posicion=%u, estado=%u, tipo=%d, nombre='%s', tamano=%u\n", i, inodosMemoria[i].posicion, inodosMemoria[i].estado, inodosMemoria[i].inodo->tipo, inodosMemoria[i].inodo->nombre, inodosMemoria[i].inodo->tamano);
 	}
 
+	// Bytes necesarios para el mapa, pueden sobrar, pero siempre menos de CHAR_BIT
+	int bytes = ((unsigned int) sizeof(bits))*PALABRAS_SYNC;
+	mapaSync = malloc(bytes);
+	// Ponemos todo a 0
+	bzero(mapaSync, bytes);
+
+	struct indices_bits ib;
+	// MIO Prueba para mapaSync
+	ib=get_indices_bits(BLOQUE_SUPERBLOQUE);
+	set_bit(&mapaSync[ib.a], ib.b);
+	// MIO Prueba para mapaSync
+	ib=get_indices_bits(BLOQUE_BITS_INODOS);
+	set_bit(&mapaSync[ib.a], ib.b);
+	// MIO Prueba para mapaSync
+	ib=get_indices_bits(BLOQUE_BITS_DATOS);
+	set_bit(&mapaSync[ib.a], ib.b);
+	// MIO Prueba para mapaSync
+	ib=get_indices_bits(BLOQUE_PRIMER_INODO);
+	set_bit(&mapaSync[ib.a], ib.b);
+
+
 	return 0;
 }
 
@@ -152,30 +202,10 @@ int mountFS(void)
  * @brief 	Unmounts the file system from the simulated device.
  * @return 	0 if success, -1 otherwise.
  */
-int unmountFS(void) // TODO
-{	
-	//Guardamos los inodos escribiendolos en disco
-	if(bwrite(DEVICE_IMAGE, (superBloque->primerInodo), (char *) inodosDisco) == -1){
-		printf("[ERROR] No se pueden guardar los inodos\n");
-		return -1;
-	}
-
-	//Guardamos el superbloque
-	if(bwrite(DEVICE_IMAGE, BLOQUE_SUPERBLOQUE, (char *) superBloque) == -1){
-		printf("[ERROR] No se puede guardar el superbloque\n");
-		return -1;
-	}
-
-	//Guardamos el mapa de bits de inodos
-	if(bwrite(DEVICE_IMAGE, BLOQUE_BITS_INODOS, (char *) mapaBitsInodos->mapa) == -1){
-		printf("[ERROR] No se puede guardar el mapa de bits de inodos\n");
-		return -1;
-	}
-	//Guardamos el mapa de bits de bloques de datos
-	if(bwrite(DEVICE_IMAGE, BLOQUE_BITS_DATOS, (char *) mapaBitsBloquesDatos->mapa) == -1){
-		printf("[ERROR] No se puede guardar el mapa de bits de datos\n");
-		return -1;
-	}
+int unmountFS(void)
+{
+	// Guardamos a disco
+	if (sincronizarDisco() == -1) return -1;
 
 	//TO-DO: Recorrer estados ficheros para cerrar todos los ficheros abiertos
 
@@ -185,7 +215,7 @@ int unmountFS(void) // TODO
 	free(mapaBitsBloquesDatos);
 	free(inodosDisco);
 	free(inodosMemoria);
-
+	free(mapaSync);
 
 	return 0;
 }
@@ -236,7 +266,7 @@ int closeFile(int fileDescriptor)
 
 	inodosMemoria[fileDescriptor].estado = CERRADO;
 
-return 0;
+	return 0;
 }
 
 /*
@@ -329,6 +359,10 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	resul = numBytes;
 	inodo->inodo->tamano += numBytes;
 	inodo->posicion += numBytes;
+
+	struct indices_bits ib = get_indices_bits(BLOQUE_PRIMER_INODO);
+	set_bit(&mapaSync[ib.a], ib.b);
+
 	return resul;
 }
 
@@ -388,16 +422,45 @@ int rmDir(char *path)
 	return -2;
 }
 
-/*
- * @brief	Lists the content of a directory and stores the inodes and names in arrays.
- * @return	The number of items in the directory, -1 if the directory does not exist, -2 in case of error..
- */
-int lsDir(char *path, int inodesDir[10], char namesDir[10][33])
-{	
-	lsDir(0, inodesDir, namesDir);
-	for(int i = 0; i < 10; i++){
+void lsInodo(int in, int listaInodos[10], char listaNombres[10][33])
+{
+	//Creamos el bufer de lectura
+	char *buferLectura = malloc(sizeof(char) * BLOCK_SIZE);
+	//Leemos del sistema de ficheros el bloque correspondiente
+	if(bread(DEVICE_IMAGE, inodosMemoria[in].inodo->bloqueDirecto, buferLectura) == -1){
+		printf("[ERROR] No se pudo leer el bloque del inodo\n");
+		return;
 	}
-	return -2;
+	//Creamos datos adicionales para sacar los tokens
+	int contador = 0;
+	int contadorInodos = 0;
+	int contadorNombres = 0;
+	char copia[256];
+	char *ptr;
+	strcpy(copia, buferLectura);
+	//Especificamos como separadores el espacio y el \n
+	ptr = strtok(copia, " \n");
+	while(ptr != NULL){
+		//Los fragmentos pares siempre son el numero de inodo
+		if(contador % 2 == 0){
+			listaInodos[contadorInodos] = atoi(ptr);
+			contadorInodos++;
+		//Los fragmentos impares siempre son el nombre del fichero/directorio
+		}else{
+			strcpy(listaNombres[contadorNombres], ptr);
+			contadorNombres++;
+		}
+		ptr = strtok(NULL, " \n");
+		contador++;
+	}
+	//Rellenamos el resto de casillas de las listas con -1 y con "" respectivamente
+	for(int i = contador/2; i < 10; i++){
+		listaInodos[i] = -1;
+		strcpy(listaNombres[i], "");
+	}
+	//Liberamos el bufer de lectura
+	free(buferLectura);
+	return;
 }
 
 //Acorta en un nivel la ruta proporcionada y retorna el primer elemento
@@ -416,6 +479,71 @@ void trocearRuta(char **path, char **profundidadSuperior)
 	strcpy(*profundidadSuperior, ptr);
 	return;
 }
+
+int lsDirAuxiliar(char* path, int indice, int listaInodos[10], char listaNombres[10][33]){
+	//Condicion de parada, no queda mas ruta
+	if(strcmp(path, "") == 0){
+		for(int i = 0; i < 0; i++){
+			printf("%d %s\n", listaInodos[i], listaNombres[i]);
+		}
+	}
+	lsInodo(indice, listaInodos, listaNombres);
+	char *profundidadSuperior = malloc(sizeof(char) * 33);
+	trocearRuta(&path, &profundidadSuperior);
+	for(int i = 0; i < 10; i++){
+		if((strcmp(listaNombres[i], profundidadSuperior) == 0) &&
+			(inodosMemoria[listaInodos[i]].inodo->tipo == DIRECTORIO)){
+			indice = listaInodos[i];
+			break;
+		}
+	}
+	if(indice == -1){
+		printf("[ERROR] No se encontro el directorio externo de la ruta\n");
+		return -1;
+	}
+	lsDirAuxiliar(path, indice, listaInodos, listaNombres);
+}
+
+/*
+ * @brief	Lists the content of a directory and stores the inodes and names in arrays.
+ * @return	The number of items in the directory, -1 if the directory does not exist, -2 in case of error..
+ */
+int lsDir(char *path, int inodesDir[10], char namesDir[10][33])
+{	
+	int indice = -1;
+	int numeroElementos = 0;
+	int listaInodos[10];
+	char listaNombres[10][33];
+	numeroElementos = lsDirAuxiliar(path, indice, listaInodos, listaNombres);
+	return numeroElementos;
+}
+	/*
+	if(path == NULL){
+		printf("TODO EL DIRECTORIO\n");
+	}
+
+	int indice = -1;
+	int listaInodos[10];
+	char listaNombres[10][33];
+	//Empezamos con el inodo raiz para empezar a buscar
+	//Problema con este indice, no permite la recursividad
+	lsInodo(0, inodesDir, namesDir);
+	char *profundidadSuperior = malloc(sizeof(char) * 33);
+	trocearRuta(&path, &profundidadSuperior);
+	for(int i = 0; i < 10; i++){
+		if((strcmp(namesDir[i], profundidadSuperior) == 0) &&
+			(inodosMemoria[inodesDir[i]].inodo->tipo == DIRECTORIO)){
+			indice = i;
+			break;
+		}
+	}
+	if(indice == -1){
+		printf("[ERROR] No se encontro el directorio externo de la ruta\n");
+		return -1;
+	}
+	lsDir(path, listaInodos, listaNombres);
+	return 0;
+	*/
 
 void set_bit(bits *words, int n) {
     words[WORD_OFFSET(n)] |= (1 << BIT_OFFSET(n));
@@ -463,6 +591,9 @@ int ialloc()
 		if (get_bit(&mapaBitsInodos->mapa[a], b) == 0) {
 			//Para indicar que esta en uso le asignamos valor
 			set_bit(&mapaBitsInodos->mapa[a], b);
+			//Sincronizamos con los mapas de bits
+			struct indices_bits ib = get_indices_bits(BLOQUE_BITS_INODOS);
+			set_bit(&mapaSync[ib.a], ib.b);
 			return i;
 		}
 	}
@@ -481,6 +612,9 @@ int ifree(int i)
 	bzero(inodosMemoria[i].inodo->nombre, TAMANO_NOMBRE_FICHERO);
 	struct indices_bits ib=get_indices_bits(i);
 	clear_bit(&mapaBitsInodos->mapa[ib.a], ib.b);
+	//Sincronizamos los mapas de bits
+	ib = get_indices_bits(BLOQUE_BITS_INODOS);
+	set_bit(&mapaSync[ib.a], ib.b);
 
 	return 0;
 }
@@ -498,6 +632,8 @@ int balloc()
 		if (get_bit(&mapaBitsBloquesDatos->mapa[a], b) == 0) {
 			//Para indicar que esta en uso le asignamos valor
 			set_bit(&mapaBitsBloquesDatos->mapa[a], b);
+			struct indices_bits ib = get_indices_bits(BLOQUE_BITS_DATOS);
+			set_bit(&mapaSync[ib.a], ib.b);
 			return i;
 		}
 	}
@@ -522,6 +658,8 @@ int bfree(int i)
 	}
 	struct indices_bits ib=get_indices_bits(i);
 	clear_bit(&mapaBitsBloquesDatos->mapa[ib.a], ib.b);
+	ib = get_indices_bits(BLOQUE_BITS_DATOS);
+	set_bit(&mapaSync[ib.a], ib.b);
 	return 0;
 }
 
@@ -555,43 +693,4 @@ int bmap(int inodo_id, int offset)
 	return -1;
 }
 
-void lsInodo(int in, int listaInodos[10], char listaNombres[10][33])
-{
-	//Creamos el bufer de lectura
-	char *buferLectura = malloc(sizeof(char) * BLOCK_SIZE);
-	//Leemos del sistema de ficheros el bloque correspondiente
-	if(bread(DEVICE_IMAGE, inodosMemoria[in].inodo->bloqueDirecto, buferLectura) == -1){
-		printf("[ERROR] No se pudo leer el bloque del inodo\n");
-		return;
-	}
-	//Creamos datos adicionales para sacar los tokens
-	int contador = 0;
-	int contadorInodos = 0;
-	int contadorNombres = 0;
-	char copia[256];
-	char *ptr;
-	strcpy(copia, buferLectura);
-	//Especificamos como separadores el espacio y el \n
-	ptr = strtok(copia, " \n");
-	while(ptr != NULL){
-		//Los fragmentos pares siempre son el numero de inodo
-		if(contador % 2 == 0){
-			listaInodos[contadorInodos] = atoi(ptr);
-			contadorInodos++;
-		//Los fragmentos impares siempre son el nombre del fichero/directorio
-		}else{
-			strcpy(listaNombres[contadorNombres], ptr);
-			contadorNombres++;
-		}
-		ptr = strtok(NULL, " \n");
-		contador++;
-	}
-	//Rellenamos el resto de casillas de las listas con -1 y con "" respectivamente
-	for(int i = contador/2; i < 10; i++){
-		listaInodos[i] = -1;
-		strcpy(listaNombres[i], "");
-	}
-	//Liberamos el bufer de lectura
-	free(buferLectura);
-	return;
-}
+
