@@ -180,21 +180,6 @@ int mountFS(void)
 	// Ponemos todo a 0
 	bzero(mapaSync, bytes);
 
-	struct indices_bits ib;
-	// MIO Prueba para mapaSync
-	ib=get_indices_bits(BLOQUE_SUPERBLOQUE);
-	set_bit(&mapaSync[ib.a], ib.b);
-	// MIO Prueba para mapaSync
-	ib=get_indices_bits(BLOQUE_BITS_INODOS);
-	set_bit(&mapaSync[ib.a], ib.b);
-	// MIO Prueba para mapaSync
-	ib=get_indices_bits(BLOQUE_BITS_DATOS);
-	set_bit(&mapaSync[ib.a], ib.b);
-	// MIO Prueba para mapaSync
-	ib=get_indices_bits(BLOQUE_PRIMER_INODO);
-	set_bit(&mapaSync[ib.a], ib.b);
-
-
 	return 0;
 }
 

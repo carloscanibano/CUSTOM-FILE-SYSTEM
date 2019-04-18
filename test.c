@@ -64,6 +64,9 @@ int main()
 	printf("Monto\n");
 	if (montar()==-1) return -1;
 
+	printf("Desmonto\n");
+	if (desmontar()==-1) return -1;
+
 	return 0;
 }
 
