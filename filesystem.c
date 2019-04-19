@@ -149,6 +149,8 @@ int mkFS(long deviceSize)
 		inodosDisco[i].tamano=0;
 	}
 
+	//TO-DO: HAY QUE CREAR EL DIRECTORIO "/" POR DEFECTO
+
 	// Guardamos a disco
 	if (sincronizarDisco() == -1) return -1;
 
@@ -205,14 +207,24 @@ int unmountFS(void)
 	return 0;
 }
 
+//Crea fichero o directorio por ser procedimientos parecidos
+int crearFichero(char *path, int tipo){
+	/*
+	char buff[sizeof(FORMATO_LINEA_DIRECTORIO) + 10 + TAMANO_NOMBRE_FICHERO + 1];
+	sprintf(buff, FORMATO_LINEA_DIRECTORIO, 3, "nombre");
+	*/
+	//Tiene que tener . y .. cada directorio al ser creados...
+	//Si es 0 el identificador del inodo, es raiz, . y .. son 0
+	return -2;
+}
+
 /*
  * @brief	Creates a new file, provided it it doesn't exist in the file system.
  * @return	0 if success, -1 if the file already exists, -2 in case of error.
  */
 int createFile(char *path)
 {
-
-	return -2;
+	return crearFichero(path, FICHERO);
 }
 
 /*
@@ -395,7 +407,7 @@ int lseekFile(int fileDescriptor, long offset, int whence)
  */
 int mkDir(char *path)
 {
-	return -2;
+	return crearFichero(path, DIRECTORIO);
 }
 
 /*
@@ -445,7 +457,6 @@ void lsInodo(int in, int listaInodos[10], char listaNombres[10][33])
 	}
 	//Liberamos el bufer de lectura
 	free(buferLectura);
-	return;
 }
 
 //Acorta en un nivel la ruta proporcionada y retorna el primer elemento
@@ -462,18 +473,25 @@ void trocearRuta(char **path, char **profundidadSuperior)
 	memcpy(rutaTroceada, *path + strlen(ptr) + 1, strlen(*path) - strlen(ptr));
 	*path = rutaTroceada;
 	strcpy(*profundidadSuperior, ptr);
-	return;
 }
 
+//TO DO: Probar bien la recursividad en listar directorios
 int lsDirAuxiliar(char* path, int indice, int listaInodos[10], char listaNombres[10][33]){
 	//Condicion de parada, no queda mas ruta
 	if(strcmp(path, "") == 0){
-		for(int i = 0; i < 0; i++){
+		int i;
+		for(i = 0; i < 10; i++){
+			if(listaInodos[i] != -1){
+				i--;
+				break;
+			}
 			printf("%d %s\n", listaInodos[i], listaNombres[i]);
 		}
+		//Empezamos el bucle en 0
+		return i + 1;
 	}
 	lsInodo(indice, listaInodos, listaNombres);
-	char *profundidadSuperior = malloc(sizeof(char) * 33);
+	char *profundidadSuperior = malloc(sizeof(char) * (TAMANO_NOMBRE_FICHERO + 1));
 	trocearRuta(&path, &profundidadSuperior);
 	for(int i = 0; i < 10; i++){
 		if((strcmp(listaNombres[i], profundidadSuperior) == 0) &&
@@ -486,7 +504,7 @@ int lsDirAuxiliar(char* path, int indice, int listaInodos[10], char listaNombres
 		printf("[ERROR] No se encontro el directorio externo de la ruta\n");
 		return -1;
 	}
-	lsDirAuxiliar(path, indice, listaInodos, listaNombres);
+	return lsDirAuxiliar(path, indice, listaInodos, listaNombres);
 }
 
 /*
