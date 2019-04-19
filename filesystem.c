@@ -274,7 +274,10 @@ void trocearRuta(char *path, char *resul, char *profundidadSuperior)
 	strcpy(profundidadSuperior, ptr);
 }
 
-int existe(char *path){
+//Devuelve un 1 si existe la ruta especificada, un 0 en caso contrario
+//En el caso de ruta "/" dirSuperior es "/", indicePadre = 0, indice = 0
+void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
+	/*
 	int encontrado = 0, indice = 0, noDir = 0;
 	char *dirSuperior = malloc(TAMANO_NOMBRE_FICHERO + 1);
 	char *rutaCorta = malloc(strlen(path));
@@ -282,8 +285,10 @@ int existe(char *path){
 	int listaInodos[10];
 	char listaNombres[10][33];
 
-	//	/a/b/
-	//
+	//	/a/b/f1
+	// func("/a/b/f(no existe)", dir, n)-> dir="/a/b", n=-1
+
+	// func("/a/b/f(existe)", dir, n)-> dir="/a/b", n=inodo de f1
 	//
 
 	while((strcmp(rutaCorta, "") != 0) && (!noDir) && (inodosMemoria[indice].inodo->tipo == DIRECTORIO)){
@@ -305,7 +310,7 @@ int existe(char *path){
 	}
 	free(dirSuperior);
 	free(rutaCorta);
-	return encontrado;
+	*/
 }
 
 //Crea fichero o directorio por ser procedimientos parecidos
@@ -327,46 +332,25 @@ int createFile(char *path)
 {
 	//Varibles para encontar inodo y bloque libre.
 	int i, b, indice = 0, encontrado = 0;
-	char *rutaTroceada = malloc(strlen(path));
+	//char *rutaTroceada = malloc(strlen(path));
 	char *dirSuperior = malloc(TAMANO_NOMBRE_FICHERO + 1);
-	int listaInodos[10];
-	char listaNombres[10][33];
-
-	strcpy(rutaTroceada, path);
-
-	while(strcmp(rutaTroceada, "") == 0){
-		//trocearRuta(&rutaTroceada, &dirSuperior);
-		lsInodo(indice, listaInodos, listaNombres);
-		for(int j =0; j < 10; j++){
-			if((strcmp(dirSuperior, listaNombres[j]) == 0) && (inodosMemoria[indice].inodo->tipo == DIRECTORIO)){
-				if(strcmp(rutaTroceada, "") == 0){
-					encontrado = 1;
-				}
-				indice = listaInodos[j];
-			}else if(j == 9){
-				break;
-			}
-		}
-	}
-	free(rutaTroceada);
+	//int listaInodos[10];
+	//char listaNombres[10][33];
 
 	if(encontrado){
 		printf("[ERROR] No se puede crear del fichero, ya existe.\n");
-		free(dirSuperior);
 		return -1;
 	}
 
 	i = ialloc();
 	if(i == -1){
 		printf("[ERROR] No se puede crear del fichero, no se puede encontrar un inodo libre.\n");
-		free(dirSuperior);
 		return -2;
 	}
 
 	b = balloc();
 	if(b == -1){
 		printf("[ERROR] No se puede crear del fichero, no se puede encontrar un bloque libre.\n");
-		free(dirSuperior);
 		return -2;
 	}
 
@@ -385,7 +369,7 @@ int createFile(char *path)
 		return -1;
 	}
 	char buff[sizeof(FORMATO_LINEA_DIRECTORIO) + 10 + TAMANO_NOMBRE_FICHERO + 1];
-	sprintf(buff, FORMATO_LINEA_DIRECTORIO, i, dirSuperior);
+	sprintf(buff, FORMATO_LINEA_DIRECTORIO, i, dirSuperior); //Poner nombre del fichero
 	memcpy(bufferLectura + inodosMemoria[indice].posicion, buff, sizeof(buff));
 	free(dirSuperior);
 
@@ -395,6 +379,8 @@ int createFile(char *path)
 		return -1;
 	}
 	free(bufferLectura);
+
+	inodosMemoria[indice].inodo->tamano += strlen(buff); //Indicar el indice del padre
 
 	struct indices_bits ib = get_indices_bits(BLOQUE_PRIMER_INODO);
 	set_bit(&mapaSync[ib.a], ib.b);
@@ -465,7 +451,8 @@ int removeFile(char *path)
 
   	fichero = strstr (bufferLectura, buff);
 	strncpy(fichero, "" , strlen(buff));
-  	strncpy(fichero, fichero + strlen(buff), inodosMemoria[indice].posicion - strlen(fichero) + strlen(buff));
+	//Es el indice del padre el necesitado
+  	strncpy(fichero, fichero + strlen(buff), inodosMemoria[indice].inodo->tamano - strlen(fichero) + strlen(buff));
 
 	if(bwrite(DEVICE_IMAGE, inodosMemoria[indice].inodo->bloqueDirecto, bufferLectura) == -1){
 		printf("[ERROR] Error al formatear un bloque\n");
