@@ -92,14 +92,15 @@ struct indices_bits{
 
 // Usaremos el PALABRAS_SYNC para crear el mapa de bits del metodo sincronizarDisco
 #define PALABRAS_SYNC ((unsigned int)(ceil((double)BLOQUE_PRIMER_DATOS/(double)CHAR_BIT)))
+#define PADDING_MAPA (TAMANO_BLOQUE - (sizeof(bits) * NUM_PALABRAS))
 
 struct mapaBitsInodos{
 	bits mapa[NUM_PALABRAS];
 	//Relleno para mapa de bits
-	char relleno[TAMANO_BLOQUE - (sizeof(bits) * NUM_PALABRAS)];
+	char relleno[PADDING_MAPA];
 };
 struct mapaBitsBloquesDatos{
 	bits mapa[NUM_PALABRAS];
 	//Relleno para mapa de bits
-	char relleno[TAMANO_BLOQUE - (sizeof(bits) * NUM_PALABRAS)];
+	char relleno[PADDING_MAPA];
 };

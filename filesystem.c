@@ -118,7 +118,7 @@ int mkFS(long deviceSize)
 	char bloqueFormateado[BLOCK_SIZE];
 	unsigned int cant_bloques=deviceSize/BLOCK_SIZE;
 	bzero(bloqueFormateado, BLOCK_SIZE);
-	for(int i = 0; i < cant_bloques; i++){
+	for(int i = BLOQUE_PRIMER_DATOS; i < cant_bloques; i++){
 		if(bwrite(DEVICE_IMAGE, i, bloqueFormateado) == -1){
 			printf("[ERROR] Error al formatear un bloque\n");
 			return -1;
@@ -134,15 +134,17 @@ int mkFS(long deviceSize)
 	superBloque->primerBloqueDatos = BLOQUE_PRIMER_DATOS;
 	superBloque->numeroBloquesDatos = (unsigned int) (cant_bloques - BLOQUE_PRIMER_DATOS);
 	superBloque->tamanoDispositivo = deviceSize;
+	bzero(superBloque->relleno, PADDING_SB);
 
 	//Creacion de las estructuras estáticas de disco
 	mapaBitsInodos = malloc(sizeof(struct mapaBitsInodos));
+	bzero(mapaBitsInodos, sizeof(struct mapaBitsInodos));
 	mapaBitsBloquesDatos = malloc(sizeof(struct mapaBitsBloquesDatos));
-	// Reseteamos los bits del mapa
-	for (int i=0; i < NUM_PALABRAS; i++) mapaBitsInodos->mapa[i]=0;
-	for (int i=0; i < NUM_PALABRAS; i++) mapaBitsBloquesDatos->mapa[i]=0;
+	bzero(mapaBitsBloquesDatos, sizeof(struct mapaBitsBloquesDatos));
 
-	inodosDisco = malloc(sizeof(struct inodo) * MAX_FICHEROS);
+	// sizeof(struct inodo) * MAX_FICHEROS cabe en un bloque
+	inodosDisco = malloc(BLOCK_SIZE);
+	bzero(inodosDisco, BLOCK_SIZE);
 	for (int i=0; i < MAX_FICHEROS; i++) {
 		inodosDisco[i].tipo=FICHERO;
 		strcpy(inodosDisco[i].nombre, "");
@@ -207,6 +209,62 @@ int unmountFS(void)
 	return 0;
 }
 
+void lsInodo(int in, int listaInodos[10], char listaNombres[10][33])
+{
+	//Creamos el bufer de lectura
+	char *buferLectura = malloc(sizeof(char) * BLOCK_SIZE);
+	//Leemos del sistema de ficheros el bloque correspondiente
+	if(bread(DEVICE_IMAGE, inodosMemoria[in].inodo->bloqueDirecto, buferLectura) == -1){
+		printf("[ERROR] No se pudo leer el bloque del inodo\n");
+		return;
+	}
+	//Creamos datos adicionales para sacar los tokens
+	int contador = 0;
+	int contadorInodos = 0;
+	int contadorNombres = 0;
+	char copia[256];
+	char *ptr;
+	strcpy(copia, buferLectura);
+	//Especificamos como separadores el espacio y el \n
+	ptr = strtok(copia, " \n");
+	while(ptr != NULL){
+		//Los fragmentos pares siempre son el numero de inodo
+		if(contador % 2 == 0){
+			listaInodos[contadorInodos] = atoi(ptr);
+			contadorInodos++;
+		//Los fragmentos impares siempre son el nombre del fichero/directorio
+		}else{
+			strcpy(listaNombres[contadorNombres], ptr);
+			contadorNombres++;
+		}
+		ptr = strtok(NULL, " \n");
+		contador++;
+	}
+	//Rellenamos el resto de casillas de las listas con -1 y con "" respectivamente
+	for(int i = contador/2; i < 10; i++){
+		listaInodos[i] = -1;
+		strcpy(listaNombres[i], "");
+	}
+	//Liberamos el bufer de lectura
+	free(buferLectura);
+}
+
+//Acorta en un nivel la ruta proporcionada y retorna el primer elemento
+void trocearRuta(char **path, char **profundidadSuperior)
+{
+	//Creamos datos adicionales para sacar los tokens
+	char *rutaTroceada = malloc(strlen(*path));
+	char copia[strlen(*path)];
+	char *ptr = NULL;
+	strcpy(copia, *path);
+	//Especificamos como separadores el espacio y el \n
+	ptr = strtok(copia, "/");
+	//Eliminamos un nivel de profundidad de la ruta
+	memcpy(rutaTroceada, *path + strlen(ptr) + 1, strlen(*path) - strlen(ptr));
+	*path = rutaTroceada;
+	strcpy(*profundidadSuperior, ptr);
+}
+
 //Crea fichero o directorio por ser procedimientos parecidos
 int crearFichero(char *path, int tipo){
 	/*
@@ -224,7 +282,80 @@ int crearFichero(char *path, int tipo){
  */
 int createFile(char *path)
 {
-	return crearFichero(path, FICHERO);
+	//Varibles para encontar inodo y bloque libre.
+	int i, b, indice = 0, encontrado = 0;
+	char *rutaTroceada = malloc(strlen(path));
+	char *dirSuperior = malloc(TAMANO_NOMBRE_FICHERO + 1);
+	int listaInodos[10];
+	char listaNombres[10][33];
+
+	strcpy(rutaTroceada, path);
+
+	while(strcmp(rutaTroceada, "") == 0){
+		trocearRuta(&rutaTroceada, &dirSuperior);
+		lsInodo(indice, listaInodos, listaNombres);
+		for(int j =0; j < 10; j++){
+			if((strcmp(dirSuperior, listaNombres[j]) == 0) && (inodosMemoria[indice].inodo->tipo == DIRECTORIO)){
+				if((strcmp(rutaTroceada, "") == 0) && (inodosMemoria[listaInodos[j]].inodo->tipo == FICHERO)){
+					encontrado = 1;
+				}
+				indice = listaInodos[j];
+				}else if(j == 9){
+					break;
+				}
+		}
+	}
+
+	if(encontrado){
+		printf("[ERROR] No se puede crear del fichero, ya existe.\n");
+		return -1;
+	}
+
+	i = ialloc();
+	if(i == -1){
+		printf("[ERROR] No se puede crear del fichero, no se puede encontrar un inodo libre.\n");
+		return -2;
+	}
+
+	b = balloc();
+	if(b == -1){
+		printf("[ERROR] No se puede crear del fichero, no se puede encontrar un bloque libre.\n");
+		return -2;
+	}
+
+	inodosMemoria[i].inodo->tipo = FICHERO;
+	strcpy(inodosMemoria[i].inodo->nombre, dirSuperior);
+	inodosMemoria[i].inodo->tamano = 0;
+	inodosMemoria[i].inodo->bloqueDirecto = b;
+	inodosMemoria[i].posicion = 0;
+	inodosMemoria[i].estado = CERRADO;
+
+	char *bufferLectura = malloc(sizeof(char) * BLOCK_SIZE);
+	if(bread(DEVICE_IMAGE, inodosMemoria[indice].inodo->bloqueDirecto, bufferLectura) == -1){
+		printf("[ERROR] No se pudo leer el bloque del inodo\n");
+		return -1;
+	}
+	char buff[sizeof(FORMATO_LINEA_DIRECTORIO) + 10 + TAMANO_NOMBRE_FICHERO + 1];
+	sprintf(buff, FORMATO_LINEA_DIRECTORIO, i, dirSuperior);
+	memcpy(bufferLectura + inodosMemoria[indice].posicion, buff, sizeof(buff));
+
+	if(bwrite(DEVICE_IMAGE, inodosMemoria[indice].inodo->bloqueDirecto, bufferLectura) == -1){
+		printf("[ERROR] Error al formatear un bloque\n");
+		return -1;
+	}
+
+	struct indices_bits ib = get_indices_bits(BLOQUE_PRIMER_INODO);
+	set_bit(&mapaSync[ib.a], ib.b);
+	ib = get_indices_bits(BLOQUE_BITS_DATOS);
+	set_bit(&mapaSync[ib.a], ib.b);
+	//Este para directorio tambien
+	/*
+		struct indices_bits ib = get_indices_bits(BLOQUE_BITS_INODOS);
+		set_bit(&mapaSync[ib.a], ib.b);
+	*/
+
+	return 0;
+	//return crearFichero(path, FICHERO);
 }
 
 /*
@@ -417,62 +548,6 @@ int mkDir(char *path)
 int rmDir(char *path)
 {
 	return -2;
-}
-
-void lsInodo(int in, int listaInodos[10], char listaNombres[10][33])
-{
-	//Creamos el bufer de lectura
-	char *buferLectura = malloc(sizeof(char) * BLOCK_SIZE);
-	//Leemos del sistema de ficheros el bloque correspondiente
-	if(bread(DEVICE_IMAGE, inodosMemoria[in].inodo->bloqueDirecto, buferLectura) == -1){
-		printf("[ERROR] No se pudo leer el bloque del inodo\n");
-		return;
-	}
-	//Creamos datos adicionales para sacar los tokens
-	int contador = 0;
-	int contadorInodos = 0;
-	int contadorNombres = 0;
-	char copia[256];
-	char *ptr;
-	strcpy(copia, buferLectura);
-	//Especificamos como separadores el espacio y el \n
-	ptr = strtok(copia, " \n");
-	while(ptr != NULL){
-		//Los fragmentos pares siempre son el numero de inodo
-		if(contador % 2 == 0){
-			listaInodos[contadorInodos] = atoi(ptr);
-			contadorInodos++;
-		//Los fragmentos impares siempre son el nombre del fichero/directorio
-		}else{
-			strcpy(listaNombres[contadorNombres], ptr);
-			contadorNombres++;
-		}
-		ptr = strtok(NULL, " \n");
-		contador++;
-	}
-	//Rellenamos el resto de casillas de las listas con -1 y con "" respectivamente
-	for(int i = contador/2; i < 10; i++){
-		listaInodos[i] = -1;
-		strcpy(listaNombres[i], "");
-	}
-	//Liberamos el bufer de lectura
-	free(buferLectura);
-}
-
-//Acorta en un nivel la ruta proporcionada y retorna el primer elemento
-void trocearRuta(char **path, char **profundidadSuperior)
-{
-	//Creamos datos adicionales para sacar los tokens
-	char *rutaTroceada = malloc(strlen(*path));
-	char copia[strlen(*path)];
-	char *ptr = NULL;
-	strcpy(copia, *path);
-	//Especificamos como separadores el espacio y el \n
-	ptr = strtok(copia, "/");
-	//Eliminamos un nivel de profundidad de la ruta
-	memcpy(rutaTroceada, *path + strlen(ptr) + 1, strlen(*path) - strlen(ptr));
-	*path = rutaTroceada;
-	strcpy(*profundidadSuperior, ptr);
 }
 
 //TO DO: Probar bien la recursividad en listar directorios
