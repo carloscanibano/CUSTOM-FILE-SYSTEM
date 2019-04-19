@@ -216,6 +216,7 @@ void lsInodo(int in, int listaInodos[10], char listaNombres[10][33])
 	//Leemos del sistema de ficheros el bloque correspondiente
 	if(bread(DEVICE_IMAGE, inodosMemoria[in].inodo->bloqueDirecto, buferLectura) == -1){
 		printf("[ERROR] No se pudo leer el bloque del inodo\n");
+		free(buferLectura);
 		return;
 	}
 	//Creamos datos adicionales para sacar los tokens
@@ -250,19 +251,61 @@ void lsInodo(int in, int listaInodos[10], char listaNombres[10][33])
 }
 
 //Acorta en un nivel la ruta proporcionada y retorna el primer elemento
-void trocearRuta(char **path, char **profundidadSuperior)
+void trocearRuta(char *path, char *resul, char *profundidadSuperior)
 {
-	//Creamos datos adicionales para sacar los tokens
-	char *rutaTroceada = malloc(strlen(*path));
-	char copia[strlen(*path)];
-	char *ptr = NULL;
-	strcpy(copia, *path);
+	if(strcmp(path, "") == 0){
+		strcpy(resul, "");
+		strcpy(profundidadSuperior, "");
+		return;
+	}
+	if(strcmp(path, "/") == 0){
+		strcpy(resul, "");
+		strcpy(profundidadSuperior, "/");
+		return;
+	}
+
+	char copia[strlen(path)];
+	strcpy(copia, path);
 	//Especificamos como separadores el espacio y el \n
-	ptr = strtok(copia, "/");
+	char *ptr = strtok(copia, "/");
+
 	//Eliminamos un nivel de profundidad de la ruta
-	memcpy(rutaTroceada, *path + strlen(ptr) + 1, strlen(*path) - strlen(ptr));
-	*path = rutaTroceada;
-	strcpy(*profundidadSuperior, ptr);
+	memcpy(resul, path + strlen(ptr) + 1, strlen(path) - strlen(ptr));
+	strcpy(profundidadSuperior, ptr);
+}
+
+int existe(char *path){
+	int encontrado = 0, indice = 0, noDir = 0;
+	char *dirSuperior = malloc(TAMANO_NOMBRE_FICHERO + 1);
+	char *rutaCorta = malloc(strlen(path));
+	strcpy(rutaCorta, path);
+	int listaInodos[10];
+	char listaNombres[10][33];
+
+	//	/a/b/
+	//
+	//
+
+	while((strcmp(rutaCorta, "") != 0) && (!noDir) && (inodosMemoria[indice].inodo->tipo == DIRECTORIO)){
+		trocearRuta(rutaCorta, rutaCorta, dirSuperior);
+		lsInodo(indice, listaInodos, listaNombres);
+		for(int j =0; j < 10; j++){
+			if((strcmp(dirSuperior, listaNombres[j]) == 0)){
+				indice = listaInodos[j];
+				if((strcmp(rutaCorta, "") == 0)){
+					encontrado = 1;
+					break;
+				}
+			}else if (j == 9){
+				if((strcmp(rutaCorta, "") == 0)){
+					noDir = 1;
+				}
+			}
+		}
+	}
+	free(dirSuperior);
+	free(rutaCorta);
+	return encontrado;
 }
 
 //Crea fichero o directorio por ser procedimientos parecidos
@@ -292,34 +335,38 @@ int createFile(char *path)
 	strcpy(rutaTroceada, path);
 
 	while(strcmp(rutaTroceada, "") == 0){
-		trocearRuta(&rutaTroceada, &dirSuperior);
+		//trocearRuta(&rutaTroceada, &dirSuperior);
 		lsInodo(indice, listaInodos, listaNombres);
 		for(int j =0; j < 10; j++){
 			if((strcmp(dirSuperior, listaNombres[j]) == 0) && (inodosMemoria[indice].inodo->tipo == DIRECTORIO)){
-				if((strcmp(rutaTroceada, "") == 0) && (inodosMemoria[listaInodos[j]].inodo->tipo == FICHERO)){
+				if(strcmp(rutaTroceada, "") == 0){
 					encontrado = 1;
 				}
 				indice = listaInodos[j];
-				}else if(j == 9){
-					break;
-				}
+			}else if(j == 9){
+				break;
+			}
 		}
 	}
+	free(rutaTroceada);
 
 	if(encontrado){
 		printf("[ERROR] No se puede crear del fichero, ya existe.\n");
+		free(dirSuperior);
 		return -1;
 	}
 
 	i = ialloc();
 	if(i == -1){
 		printf("[ERROR] No se puede crear del fichero, no se puede encontrar un inodo libre.\n");
+		free(dirSuperior);
 		return -2;
 	}
 
 	b = balloc();
 	if(b == -1){
 		printf("[ERROR] No se puede crear del fichero, no se puede encontrar un bloque libre.\n");
+		free(dirSuperior);
 		return -2;
 	}
 
@@ -333,16 +380,21 @@ int createFile(char *path)
 	char *bufferLectura = malloc(sizeof(char) * BLOCK_SIZE);
 	if(bread(DEVICE_IMAGE, inodosMemoria[indice].inodo->bloqueDirecto, bufferLectura) == -1){
 		printf("[ERROR] No se pudo leer el bloque del inodo\n");
+		free(dirSuperior);
+		free(bufferLectura);
 		return -1;
 	}
 	char buff[sizeof(FORMATO_LINEA_DIRECTORIO) + 10 + TAMANO_NOMBRE_FICHERO + 1];
 	sprintf(buff, FORMATO_LINEA_DIRECTORIO, i, dirSuperior);
 	memcpy(bufferLectura + inodosMemoria[indice].posicion, buff, sizeof(buff));
+	free(dirSuperior);
 
 	if(bwrite(DEVICE_IMAGE, inodosMemoria[indice].inodo->bloqueDirecto, bufferLectura) == -1){
 		printf("[ERROR] Error al formatear un bloque\n");
+		free(bufferLectura);
 		return -1;
 	}
+	free(bufferLectura);
 
 	struct indices_bits ib = get_indices_bits(BLOQUE_PRIMER_INODO);
 	set_bit(&mapaSync[ib.a], ib.b);
@@ -353,7 +405,6 @@ int createFile(char *path)
 		struct indices_bits ib = get_indices_bits(BLOQUE_BITS_INODOS);
 		set_bit(&mapaSync[ib.a], ib.b);
 	*/
-
 	return 0;
 	//return crearFichero(path, FICHERO);
 }
@@ -364,7 +415,69 @@ int createFile(char *path)
  */
 int removeFile(char *path)
 {
-	return -2;
+	int encontrado = 0, indice = 0;
+	char *rutaTroceada = malloc(strlen(path));
+	char *dirSuperior = malloc(TAMANO_NOMBRE_FICHERO + 1);
+	int listaInodos[10];
+	char listaNombres[10][33];
+
+
+	strcpy(rutaTroceada, path);
+	while(strcmp(rutaTroceada, "") == 0){
+
+		//trocearRuta(&rutaTroceada, &dirSuperior);
+		lsInodo(indice, listaInodos, listaNombres);
+		for(int j =0; j < 10; j++){
+			if((strcmp(dirSuperior, listaNombres[j]) == 0) && (inodosMemoria[indice].inodo->tipo == DIRECTORIO)){
+				if((strcmp(rutaTroceada, "") == 0) && (inodosMemoria[listaInodos[j]].inodo->tipo == FICHERO)){
+					encontrado = 1;
+				}
+				indice = listaInodos[j];
+			}else if(j == 9){
+				break;
+			}
+		}
+	}
+
+	if(!encontrado){
+		printf("[ERROR] No se puede borrar del fichero, no existe.\n");
+		return -1;
+	}
+
+	if(ifree(indice) == -1){
+		printf("[ERROR] No se puede borrar el fichero, error al liberar el la posicion del bitmap.\n");
+		return -2;
+	}
+
+	if(bfree(inodosMemoria[indice].inodo->bloqueDirecto) == -1){
+		printf("[ERROR] No se puede borrar el fichero, error al liberar el bloque de datos.\n");
+		return -2;
+	}
+
+	char *bufferLectura = malloc(sizeof(char) * BLOCK_SIZE);
+	if(bread(DEVICE_IMAGE, inodosMemoria[indice].inodo->bloqueDirecto, bufferLectura) == -1){
+		printf("[ERROR] No se pudo leer el bloque del inodo\n");
+		return -1;
+	}
+	char *fichero;
+	char buff[sizeof(FORMATO_LINEA_DIRECTORIO) + 10 + TAMANO_NOMBRE_FICHERO + 1];
+	sprintf(buff, FORMATO_LINEA_DIRECTORIO, indice, dirSuperior);
+
+  	fichero = strstr (bufferLectura, buff);
+	strncpy(fichero, "" , strlen(buff));
+  	strncpy(fichero, fichero + strlen(buff), inodosMemoria[indice].posicion - strlen(fichero) + strlen(buff));
+
+	if(bwrite(DEVICE_IMAGE, inodosMemoria[indice].inodo->bloqueDirecto, bufferLectura) == -1){
+		printf("[ERROR] Error al formatear un bloque\n");
+		return -1;
+	}
+
+	struct indices_bits ib = get_indices_bits(BLOQUE_PRIMER_INODO);
+	set_bit(&mapaSync[ib.a], ib.b);
+
+	//alguno mas por bloque directo?
+
+	return 0;
 }
 
 /*
@@ -373,7 +486,45 @@ int removeFile(char *path)
  */
 int openFile(char *path)
 {
-	return -2;
+	int encontrado = 0, indice = 0;
+	char *rutaTroceada = malloc(strlen(path));
+	char *dirSuperior = malloc(TAMANO_NOMBRE_FICHERO + 1);
+	int listaInodos[10];
+	char listaNombres[10][33];
+
+	strcpy(rutaTroceada, path);
+
+	while(strcmp(rutaTroceada, "") == 0){
+		//trocearRuta(&rutaTroceada, &dirSuperior);
+		lsInodo(indice, listaInodos, listaNombres);
+		for(int j =0; j < 10; j++){
+			if((strcmp(dirSuperior, listaNombres[j]) == 0) && (inodosMemoria[indice].inodo->tipo == DIRECTORIO)){
+				if(strcmp(rutaTroceada, "") == 0){
+					encontrado = 1;
+				}
+				indice = listaInodos[j];
+			}else if(j == 9){
+				break;
+			}
+		}
+	}
+
+	if(!encontrado){
+		printf("[ERROR] No se puede abrir del fichero, no existe.\n");
+		return -1;
+	}
+
+	if(inodosMemoria[indice].estado == ABIERTO){
+		printf("[ERROR] No se puede abrir el fichero, ya esta abierto el fichero.\n");
+		return -1;
+	}
+
+	inodosMemoria[indice].estado = ABIERTO;
+
+	free(rutaTroceada);
+	free(dirSuperior);
+
+	return 0;
 }
 
 /*
@@ -566,8 +717,12 @@ int lsDirAuxiliar(char* path, int indice, int listaInodos[10], char listaNombres
 		return i + 1;
 	}
 	lsInodo(indice, listaInodos, listaNombres);
-	char *profundidadSuperior = malloc(sizeof(char) * (TAMANO_NOMBRE_FICHERO + 1));
-	trocearRuta(&path, &profundidadSuperior);
+	char *profundidadSuperior = malloc(TAMANO_NOMBRE_FICHERO + 1);
+	char *resul = malloc(strlen(path));
+	trocearRuta(path, resul, profundidadSuperior);
+	char rutaCorta[strlen(path)];
+	strcpy(rutaCorta, resul);
+	free(resul);
 	for(int i = 0; i < 10; i++){
 		if((strcmp(listaNombres[i], profundidadSuperior) == 0) &&
 			(inodosMemoria[listaInodos[i]].inodo->tipo == DIRECTORIO)){
@@ -575,11 +730,12 @@ int lsDirAuxiliar(char* path, int indice, int listaInodos[10], char listaNombres
 			break;
 		}
 	}
+	free(profundidadSuperior);
 	if(indice == -1){
 		printf("[ERROR] No se encontro el directorio externo de la ruta\n");
 		return -1;
 	}
-	return lsDirAuxiliar(path, indice, listaInodos, listaNombres);
+	return lsDirAuxiliar(rutaCorta, indice, listaInodos, listaNombres);
 }
 
 /*
