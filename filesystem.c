@@ -199,16 +199,16 @@ void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 
 	*indicePadre = 0;
 	*indice = -1;
-
 	while((strcmp(rutaCorta, "") != 0) && (!invalido)){
 		//Comprobar que en al ruta no haya malas consideraciones
 		if((inodosMemoria[cont].inodo->tipo != DIRECTORIO) && (strcmp(rutaCorta, "") != 0)){
 			invalido = 1;
 			break;
 		}
-
+		//printf("%s\n", rutaCorta);
 		//traza("Hemos comprobado que el padre es directorio y la ruta no ha terminado\n\n");
 		trocearRuta(rutaCorta, rutaCorta, dirSuperior);
+		//printf("%s\n", rutaCorta);
 		//Comprobamos que la ruta solo sea /
 		if((strcmp(dirSuperior, "/") == 0) && (strcmp(rutaCorta, "") == 0)){
 			*indice = 0;
@@ -217,6 +217,7 @@ void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 			//printf("Valor de rutaCorta antes de buscar: %s\n", rutaCorta);
 			//printf("Valor de dirSuperior antes de buscar: %s\n", dirSuperior);
 			for(int j = 0; j < 10; j++){
+				//printf("Valor de Lista Nombres: %s\n", listaNombres[j]);
 				if((strcmp(dirSuperior, listaNombres[j]) == 0)){
 					//printf("Hemos encontrado %s en la lista de nombres\n", dirSuperior);
 					//Si hemos terminado la ruta y encontramos coincidencia retornamos el nodo
@@ -234,10 +235,13 @@ void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 				}else if (j == 9){
 					//Si hay mas ruta es que la ruta no es valida
 					//printf("rutaCorta antes de hacer if maldito: %s\n\n", rutaCorta);
+					//printf("llego\n");
+					//printf("%s\n", rutaCorta);
 					if((strcmp(rutaCorta, "") != 0)){
 						//printf("No deberiamos entrar aqui\n\n");
 						invalido = 1;
 					}else{
+						//printf("llego\n");
 						//Tenemos el indice del padre, pero no encontramos el que queremos crear
 						*indicePadre = cont;
 					}
@@ -263,7 +267,7 @@ int crearFichero(char *path, int tipo){
 	char *dirSuperiorAux = malloc(strlen(path));
 	int inodoPadre, inodo, b;
 	infoFichero(path, dirSuperiorAux, &inodoPadre, &inodo);
-
+	//printf("llego\n");
 	//printf("1. infoFichero ha funcionado con valores, %s, %d, %d\n", dirSuperiorAux, inodoPadre, inodo);
 
 	// Pasamos a array para evitarnos hacer free en los muchos errores
@@ -273,6 +277,8 @@ int crearFichero(char *path, int tipo){
 	dirSuperior[tamNombre]='\0';
 	free(dirSuperiorAux);
 
+	//printf("Inodo Padre %d\n", inodoPadre);
+	//printf("Inodo Encontrado %d\n", inodo);
 	if (inodoPadre < 0) {
 		traza("[ERROR] Ruta invalida.\n");
 		return -2;
@@ -281,18 +287,18 @@ int crearFichero(char *path, int tipo){
 		traza("[ERROR] El archivo ya existe.\n");
 		return -1;
 	}
-
 	inodo = ialloc();
 	if(inodo == -1){
 		traza("[ERROR] No se puede crear del fichero, no se puede encontrar un inodo libre.\n");
 		return -2;
 	}
-
+	printf("Inodo %d\n", inodo);
 	b = balloc();
 	if(b == -1){
 		traza("[ERROR] No se puede crear del fichero, no se puede encontrar un bloque libre.\n");
 		return -2;
 	}
+	//printf("Bloque %d\n", b);
 
 	//printf("2. inodo y bloque asociados con valor, %d, %d\n", inodo, b);
 
@@ -307,8 +313,9 @@ int crearFichero(char *path, int tipo){
 	if(esRaiz){
 		strcpy(inodosDisco[inodo].nombre, "/");
 	}else{
-		strcpy(inodosDisco[inodo].nombre, path + tamNombre + 1);
+		strcpy(inodosDisco[inodo].nombre, dirSuperior);
 	}
+	//printf("NOMBRE %s\n", inodosDisco[inodo].nombre );
 	inodosDisco[inodo].tamano = 0;
 	inodosDisco[inodo].bloqueDirecto = b;
 
@@ -330,10 +337,12 @@ int crearFichero(char *path, int tipo){
 			free(bufferLectura);
 			return -2;
 		}
+		//printf("Buffer: %s\n", bufferLectura);
+		//printf("Tamaño: %d\n", inodosMemoria[inodoPadre].inodo->tamano);
 		//Poner nombre del fichero, la direccion es ruta + strlen(dirSuperior) + 1 por la /
-		sprintf(buff, FORMATO_LINEA_DIRECTORIO, inodo, path + tamNombre + 1);
+		sprintf(buff, FORMATO_LINEA_DIRECTORIO, inodo, dirSuperior);
 		memcpy(bufferLectura + inodosMemoria[inodoPadre].inodo->tamano, buff, sizeof(buff));
-
+		//printf("Buffer: %s\n", bufferLectura);
 		if(bwrite(DEVICE_IMAGE, inodosMemoria[inodoPadre].inodo->bloqueDirecto, bufferLectura) == -1){
 			traza("[ERROR] Error al formatear un bloque\n");
 			free(bufferLectura);
@@ -341,7 +350,8 @@ int crearFichero(char *path, int tipo){
 		}
 		free(bufferLectura);
 
-		inodosMemoria[inodoPadre].inodo->tamano += strlen(buff); //Indicar el indice del padre
+		inodosMemoria[inodoPadre].inodo->tamano += strlen(buff);
+		//printf("Tamaño: %d\n", inodosMemoria[inodoPadre].inodo->tamano);
 	}
 
 	if(tipo == DIRECTORIO){
@@ -358,6 +368,7 @@ int crearFichero(char *path, int tipo){
 		sprintf(buff, FORMATO_LINEA_DIRECTORIO, inodoPadre, "..");
 		//Anadir ".."
 		memcpy(bufferLectura + tamNombre, buff, sizeof(buff));
+		//printf("Buffer: %s\n", bufferLectura);
 		//Escribimos buff sin desplazamiento por estar el bloque vacio, "."
 		if(bwrite(DEVICE_IMAGE, inodosDisco[inodo].bloqueDirecto, bufferLectura) == -1){
 			traza("[ERROR] Error al formatear un bloque\n");
@@ -366,9 +377,8 @@ int crearFichero(char *path, int tipo){
 		}
 		//Modificamos el tamano del directorio creado ahora mismo
 		inodosDisco[inodo].tamano += strlen(buff) + tamNombre;
-		free(bufferLectura);
+		if (esRaiz) free(bufferLectura);
 	}
-
 	return 0;
 }
 
@@ -919,7 +929,7 @@ int lsDirAuxiliar(char* path, int indice, int listaInodos[10], char listaNombres
  * @return	The number of items in the directory, -1 if the directory does not exist, -2 in case of error..
  */
 int lsDir(char *path, int inodesDir[10], char namesDir[10][33])
-{	
+{
 	int numeroElementos = 0;
 	int listaInodos[10];
 	char listaNombres[10][33];
@@ -1072,5 +1082,3 @@ int bmap(int inodo_id, int offset)
 
 	return -1;
 }
-
-
