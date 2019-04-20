@@ -36,29 +36,32 @@ void bloqueModificado(int bloque) {
 	struct indices_bits ib = get_indices_bits(bloque);
 	set_bit(&mapaSync[ib.a], ib.b);
 }
+
 // Guarda en disco los bloques iniciales si es necesario
 int sincronizarDisco() {
 	struct indices_bits ib;
 
 	ib=get_indices_bits(BLOQUE_SUPERBLOQUE);
-	if (mapaSync != NULL && get_bit(&mapaSync[ib.a], ib.b) == 1) {
+	if (get_bit(&mapaSync[ib.a], ib.b) == 1) {
 		// SuperBloque
 		//printf("Escribo el SB:\nmagico=%u, numeroBloquesMapaInodos=%u, numeroBloquesMapaDatos=%u, numeroInodos=%u, primerInodo=%u, primerBloqueDatos=%u, numeroBloquesDatos=%u, tamanoDispositivo=%u B\n", superBloque->numeroMagico, superBloque->numeroBloquesMapaInodos, superBloque->numeroBloquesMapaDatos, superBloque->numeroInodos, superBloque->primerInodo, superBloque->primerBloqueDatos, superBloque->numeroBloquesDatos, superBloque->tamanoDispositivo);
 		if(bwrite(DEVICE_IMAGE, BLOQUE_SUPERBLOQUE, (char *) superBloque) == -1){
 			traza("[ERROR] No se puede guardar el mapa de bits de datos\n");
 			return -1;
 		}
+		clear_bit(&mapaSync[ib.a], ib.b);
 	}
 	ib=get_indices_bits(BLOQUE_BITS_INODOS);
-	if (mapaSync != NULL && get_bit(&mapaSync[ib.a], ib.b) == 1) {
+	if (get_bit(&mapaSync[ib.a], ib.b) == 1) {
 		// Mapa de bits de inodos
 		if(bwrite(DEVICE_IMAGE, BLOQUE_BITS_INODOS, (char *) mapaBitsInodos->mapa) == -1){
 			traza("[ERROR] No se puede guardar el mapa de bits de inodos\n");
 			return -1;
 		}
+		clear_bit(&mapaSync[ib.a], ib.b);
 	}
 	ib=get_indices_bits(BLOQUE_BITS_DATOS);
-	if (mapaSync != NULL && get_bit(&mapaSync[ib.a], ib.b) == 1) {
+	if (get_bit(&mapaSync[ib.a], ib.b) == 1) {
 		// Mapa de bits de bloques de datos
 		if(bwrite(DEVICE_IMAGE, BLOQUE_BITS_DATOS, (char *) mapaBitsBloquesDatos->mapa) == -1){
 			traza("[ERROR] No se puede guardar el mapa de bits de datos\n");
@@ -66,18 +69,25 @@ int sincronizarDisco() {
 		}
 	}
 	ib=get_indices_bits(BLOQUE_PRIMER_INODO);
-	if (mapaSync != NULL && get_bit(&mapaSync[ib.a], ib.b) == 1) {
+	if (get_bit(&mapaSync[ib.a], ib.b) == 1) {
 		//Guardamos los inodos
 		if(bwrite(DEVICE_IMAGE, BLOQUE_PRIMER_INODO, (char *) inodosDisco) == -1){
 			traza("[ERROR] No se pueden guardar los inodos\n");
 			return -1;
 		}
+		/*printf("Guardando inodos:\n");
+		for (int i=0; i < MAX_FICHEROS; i++) {
+			printf("inodosDisco[%d]: tipo=%u, nombre='%s', tamano=%u, bloqueDirecto=%u\n", i, inodosDisco[i].tipo, inodosDisco[i].nombre, inodosDisco[i].tamano, inodosDisco[i].bloqueDirecto);
+		}*/
 	}
 
 	return 0;
 }
+
 // Lee de disco los bloques iniciales si es necesario
 int sincronizarMemoria() {
+	// Si los punteros son nulos, no ha habido mkFS
+
 	if (superBloque == NULL) {
 		superBloque = malloc(TAMANO_BLOQUE);
 		//Leer el superbloque
@@ -109,6 +119,10 @@ int sincronizarMemoria() {
 			traza("[ERROR] Error al leer los inodos\n");
 			return -1;
 		}
+		/*printf("Recogiendo inodos:\n");
+		for (int i=0; i < MAX_FICHEROS; i++) {
+			printf("inodosDisco[%d]: tipo=%u, nombre='%s', tamano=%u, bloqueDirecto=%u\n", i, inodosDisco[i].tipo, inodosDisco[i].nombre, inodosDisco[i].tamano, inodosDisco[i].bloqueDirecto);
+		}*/
 	}
 
 	return 0;
@@ -292,18 +306,18 @@ int crearFichero(char *path, int tipo){
 		traza("[ERROR] No se puede crear del fichero, no se puede encontrar un inodo libre.\n");
 		return -2;
 	}
-	printf("Inodo %d\n", inodo);
+	printf("crearFichero Inodo %d\n", inodo);
 	b = balloc();
 	if(b == -1){
 		traza("[ERROR] No se puede crear del fichero, no se puede encontrar un bloque libre.\n");
 		return -2;
 	}
-	//printf("Bloque %d\n", b);
+	printf("crearFichero Bloque %d\n", b);
 
 	//printf("2. inodo y bloque asociados con valor, %d, %d\n", inodo, b);
 
 	if(esRaiz){
-		if(inodo != 0 || b != 0){
+		if(inodo != 0 || b != superBloque->primerBloqueDatos){
 			traza("[ERROR] No se puede crear /, sistema corrupto.\n");
 			return -3;
 		}
@@ -402,21 +416,25 @@ int eliminarFichero(char *path, int tipo) {
 		return -1;
 	}
 
+	if (tipo != inodosMemoria[inodo].inodo->tipo) {
+		traza("[ERROR] Borrado de otro tipo.\n");
+		return -3;
+	}
+
 	if(ifree(inodo) == -1){
-		traza("[ERROR] No se puede borrar el fichero, error al liberar el la posicion del bitmap de inodos.\n");
+		traza("[ERROR] No se puede borrar el fichero, error al liberar el inodo.\n");
 		return -2;
 	}
 
-	if(bfree(inodo) == -1){
-		traza("[ERROR] No se puede borrar el fichero, error al liberar el la posicion del bitmap de bloques.\n");
+	if(bfree(inodosMemoria[inodo].inodo->bloqueDirecto) == -1){
+		traza("[ERROR] No se puede borrar el fichero, error al liberar el bloque.\n");
 		return -2;
 	}
 
-	char *bufferLectura, *bufferEscritura, *buffAux;
-
+	char *bufferLectura = malloc(BLOCK_SIZE);
+	bzero(bufferLectura, BLOCK_SIZE);
 	// Si es directorio y tiene ficheros, entonces no borramos y error
 	if (tipo == DIRECTORIO) {
-		bufferLectura = malloc(BLOCK_SIZE);
 		if(bread(DEVICE_IMAGE, inodosMemoria[inodo].inodo->bloqueDirecto, bufferLectura) == -1){
 			free(bufferLectura);
 			traza("[ERROR] No se pudo leer el directorio que lo contiene.\n");
@@ -432,13 +450,13 @@ int eliminarFichero(char *path, int tipo) {
 				if (c > 2) break;
 			}
 		}
-		free(bufferLectura);
 
 		if (c > 2) {
 			traza("[ERROR] El directorio a borrar tiene contenido.\n");
 			return -2;
 		}
 	}
+	free(bufferLectura);
 
 	// Reseteamos el inodo
 	inodosMemoria[inodo].inodo->tipo=FICHERO;
@@ -447,9 +465,9 @@ int eliminarFichero(char *path, int tipo) {
 
 	bloqueModificado(superBloque->primerInodo);
 
-	// Formateamos el bloque
-	bufferEscritura = malloc(BLOCK_SIZE);
+	char *bufferEscritura = malloc(BLOCK_SIZE);
 	bzero(bufferEscritura, BLOCK_SIZE);
+	// Formateamos el bloque
 	if(bwrite(DEVICE_IMAGE, inodosMemoria[inodo].inodo->bloqueDirecto, bufferEscritura) == -1){
 		free(bufferEscritura);
 		traza("[ERROR] Error al formatear un bloque\n");
@@ -458,8 +476,8 @@ int eliminarFichero(char *path, int tipo) {
 	free(bufferEscritura);
 
 	// Leer las entradas del directorio padre
-	bzero(bufferLectura, BLOCK_SIZE);
 	bufferLectura = malloc(BLOCK_SIZE);
+	bzero(bufferLectura, BLOCK_SIZE);
 	if(bread(DEVICE_IMAGE, inodosMemoria[inodoPadre].inodo->bloqueDirecto, bufferLectura) == -1){
 		free(bufferLectura);
 		traza("[ERROR] No se pudo leer el directorio que lo contiene\n");
@@ -468,7 +486,8 @@ int eliminarFichero(char *path, int tipo) {
 
 	// Eliminar la entrada del padre
 	unsigned int inodoEncontrado;
-	buffAux=malloc(BLOCK_SIZE);
+	bufferEscritura = malloc(BLOCK_SIZE);
+	bzero(bufferEscritura, BLOCK_SIZE);
 	char *token = strtok(bufferLectura, "\n");
 	unsigned char tam=10, tam2, i;
 	char inodoStr[tam];
@@ -485,24 +504,19 @@ int eliminarFichero(char *path, int tipo) {
 		inodoEncontrado=atoi(inodoStr);
 		// Si es un inodo diferente lo metemos en el auxiliar
 		if (inodo != inodoEncontrado) {
-			strcat(buffAux, token);
-			strcat(buffAux, "\n");
+			strcat(bufferEscritura, token);
+			strcat(bufferEscritura, "\n");
 		}
 		token = strtok(NULL, "\n");
 	}
-
-	// Preparamos el bufferEscritura para escribir
-	bzero(bufferEscritura, BLOCK_SIZE);
-	memcpy(bufferEscritura, buffAux, strlen(buffAux));
-	free(buffAux);
+	free(bufferLectura);
 
 	if(bwrite(DEVICE_IMAGE, inodosMemoria[inodoPadre].inodo->bloqueDirecto, bufferEscritura) == -1){
-		free(bufferLectura);
+		free(bufferEscritura);
 		traza("[ERROR] No se pudo escribir el directorio que lo contiene\n");
 		return -2;
 	}
-
-	free(bufferLectura);
+	free(bufferEscritura);
 
 	return 0;
 }
@@ -559,12 +573,23 @@ int mkFS(long deviceSize)
 		inodosDisco[i].tipo=FICHERO;
 		strcpy(inodosDisco[i].nombre, "");
 		inodosDisco[i].tamano=0;
+		inodosDisco[i].bloqueDirecto=BLOQUE_PRIMER_DATOS;
 	}
 
 	if(crearFichero("/", DIRECTORIO) < 0){
 		traza("[ERROR] No se ha podido crear el directorio /\n");
 		return -1;
 	}
+
+	int bytes = ((unsigned int) sizeof(bits))*PALABRAS_SYNC;
+	mapaSync = malloc(bytes);
+	// Ponemos todo a 0
+	bzero(mapaSync, bytes);
+
+	bloqueModificado(BLOQUE_SUPERBLOQUE);
+	bloqueModificado(BLOQUE_BITS_INODOS);
+	bloqueModificado(BLOQUE_BITS_DATOS);
+	bloqueModificado(BLOQUE_PRIMER_INODO);
 
 	// Guardamos a disco
 	if (sincronizarDisco() == -1) return -1;
@@ -583,28 +608,22 @@ int mountFS(void)
 	// Creamos los inodos de memoria
 	inodosMemoria = malloc((sizeof(struct inodoMemoria) * superBloque->numeroInodos));
 	for (int i=0; i < superBloque->numeroInodos; i++) {
+		//printf("inodosDisco[%d]: tipo=%u, nombre='%s', tamano=%u, bloqueDirecto=%u\n", i, inodosDisco[i].tipo, inodosDisco[i].nombre, inodosDisco[i].tamano, inodosDisco[i].bloqueDirecto);
 		inodosMemoria[i].inodo=&inodosDisco[i];// Ponemos el puntero
 		inodosMemoria[i].posicion=0;
 		inodosMemoria[i].estado=CERRADO;
-		//printf("indice=%d, posicion=%u, estado=%u, tipo=%d, nombre='%s', tamano=%u\n", i, inodosMemoria[i].posicion, inodosMemoria[i].estado, inodosMemoria[i].inodo->tipo, inodosMemoria[i].inodo->nombre, inodosMemoria[i].inodo->tamano);
 	}
 
 	// Bytes necesarios para el mapa, pueden sobrar, pero siempre menos de CHAR_BIT
 	int bytes = ((unsigned int) sizeof(bits))*PALABRAS_SYNC;
-	mapaSync = malloc(bytes);
+	if (mapaSync == NULL)
+		mapaSync = malloc(bytes);
 	// Ponemos todo a 0
 	bzero(mapaSync, bytes);
 
 	// Preparamos el estado de los ficheros
 	bzero(estadoFicheros, sizeof(unsigned int) * superBloque->numeroInodos);
-	//Lectura de /
-	/*
-	int i = 0;
-	printf("indice=%d, posicion=%u, estado=%u, tipo=%d, nombre='%s', tamano=%u\n", i, inodosMemoria[i].posicion, inodosMemoria[i].estado, inodosMemoria[i].inodo->tipo, inodosMemoria[i].inodo->nombre, inodosMemoria[i].inodo->tamano);
-	char buff[BLOCK_SIZE];
-	bread(DEVICE_IMAGE, inodosMemoria[i].inodo->bloqueDirecto, buff);
-	printf("-%s-\n", buff);
-	*/
+
 	return 0;
 }
 
@@ -616,6 +635,14 @@ int unmountFS(void)
 {
 	// Guardamos a disco
 	if (sincronizarDisco() == -1) return -1;
+
+	// Leer bloques para comprobar las entradas de directorio
+	char *buff=malloc(BLOCK_SIZE);
+	if(bread(DEVICE_IMAGE, 5, buff) == -1){// Leer el directorio /a
+		traza("[ERROR] No se pueden leer la prueba\n");
+		return -1;
+	}
+	printf("-%s-", buff);
 
 	//Eliminar el estado de los ficheros al desmontar el sistema
 	bzero(estadoFicheros, sizeof(unsigned int) * superBloque->numeroInodos);
@@ -646,7 +673,9 @@ int createFile(char *path)
  */
 int removeFile(char *path)
 {
-	return eliminarFichero(path, FICHERO);
+	int ret = eliminarFichero(path, FICHERO);
+	if (ret < -2) ret = -2;
+	return ret;
 }
 
 /*
@@ -884,7 +913,9 @@ int mkDir(char *path)
  */
 int rmDir(char *path)
 {
-	return eliminarFichero(path, DIRECTORIO);
+	int ret = eliminarFichero(path, DIRECTORIO);
+	if (ret < -2) ret = -2;
+	return ret;
 }
 
 //TO DO: Probar bien la recursividad en listar directorios
@@ -1024,7 +1055,7 @@ int balloc()
 			//Para indicar que esta en uso le asignamos valor
 			set_bit(&mapaBitsBloquesDatos->mapa[a], b);
 			bloqueModificado(BLOQUE_BITS_DATOS);
-			return i;
+			return i + superBloque->primerBloqueDatos;
 		}
 	}
 	// No se ha enciontrado uno libre
@@ -1035,19 +1066,18 @@ int balloc()
 // Libera un bloque
 int bfree(int i)
 {
-	char buffer[BLOCK_SIZE];
-
 	if(i < 0 || i > superBloque->numeroBloquesDatos){
 		traza("[ERROR] Indice de bloque erroneo\n");
 		return -1;
 	}
 
+	char buffer[BLOCK_SIZE];
 	bzero(buffer, BLOCK_SIZE);
-	if(bwrite(DEVICE_IMAGE, (i + superBloque->primerBloqueDatos), buffer) == -1){
-		traza("[ERROR] No se ha encontrado el bloque\n");
+	if(bwrite(DEVICE_IMAGE, i, buffer) == -1){
+		traza("[ERROR] No se ha podido liberar el bloque\n");
 		return -1;
 	}
-	struct indices_bits ib=get_indices_bits(i);
+	struct indices_bits ib=get_indices_bits(i - superBloque->primerBloqueDatos);
 	clear_bit(&mapaBitsBloquesDatos->mapa[ib.a], ib.b);
 	bloqueModificado(BLOQUE_BITS_DATOS);
 	return 0;
