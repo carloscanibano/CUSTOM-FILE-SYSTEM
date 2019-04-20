@@ -107,120 +107,6 @@ int sincronizarMemoria() {
 	return 0;
 }
 
-/*
- * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
- * @return 	0 if success, -1 otherwise.
- */
-int mkFS(long deviceSize)
-{
-	//Nos aseguramos de que el tamano del almacenamiento es adecuado
-	if((deviceSize < MIN_TAMANO_DISCO) || (deviceSize > MAX_TAMANO_DISCO)){
-		printf("[ERROR] El tamaño del dispositivo no es adecuado\n");
-		return -1;
-	}
-
-	//Si ya se ha montado el sistema anteriormente, primero desmontamos
-	if(superBloque != NULL){
-		unmountFS();
-	}
-
-	//Necesitamos formatear el dispositivo para evitar interferencias
-	char bloqueFormateado[BLOCK_SIZE];
-	unsigned int cant_bloques=deviceSize/BLOCK_SIZE;
-	bzero(bloqueFormateado, BLOCK_SIZE);
-	for(int i = BLOQUE_PRIMER_DATOS; i < cant_bloques; i++){
-		if(bwrite(DEVICE_IMAGE, i, bloqueFormateado) == -1){
-			printf("[ERROR] Error al formatear un bloque\n");
-			return -1;
-		}
-	}
-
-	superBloque = malloc(sizeof(struct superBloque));
-	superBloque->numeroMagico = NUM_MAGICO;
-	superBloque->numeroBloquesMapaInodos = BLOQUE_BITS_INODOS_NUM;
-	superBloque->numeroBloquesMapaDatos = BLOQUE_BITS_DATOS_NUM;
-	superBloque->numeroInodos = MAX_FICHEROS;
-	superBloque->primerInodo = BLOQUE_PRIMER_INODO;
-	superBloque->primerBloqueDatos = BLOQUE_PRIMER_DATOS;
-	superBloque->numeroBloquesDatos = (unsigned int) (cant_bloques - BLOQUE_PRIMER_DATOS);
-	superBloque->tamanoDispositivo = deviceSize;
-	bzero(superBloque->relleno, PADDING_SB);
-
-	//Creacion de las estructuras estáticas de disco
-	mapaBitsInodos = malloc(sizeof(struct mapaBitsInodos));
-	bzero(mapaBitsInodos, sizeof(struct mapaBitsInodos));
-	mapaBitsBloquesDatos = malloc(sizeof(struct mapaBitsBloquesDatos));
-	bzero(mapaBitsBloquesDatos, sizeof(struct mapaBitsBloquesDatos));
-
-	// sizeof(struct inodo) * MAX_FICHEROS cabe en un bloque
-	inodosDisco = malloc(BLOCK_SIZE);
-	bzero(inodosDisco, BLOCK_SIZE);
-	for (int i=0; i < MAX_FICHEROS; i++) {
-		inodosDisco[i].tipo=FICHERO;
-		strcpy(inodosDisco[i].nombre, "");
-		inodosDisco[i].tamano=0;
-	}
-
-	//TO-DO: HAY QUE CREAR EL DIRECTORIO "/" POR DEFECTO
-
-	// Guardamos a disco
-	if (sincronizarDisco() == -1) return -1;
-
-	return 0;
-}
-
-/*
- * @brief 	Mounts a file system in the simulated device.
- * @return 	0 if success, -1 otherwise.
- */
-int mountFS(void)
-{
-	if (sincronizarMemoria() == -1) return -1;
-
-	// Creamos los inodos de memoria
-	inodosMemoria = malloc((sizeof(struct inodoMemoria) * superBloque->numeroInodos));
-	for (int i=0; i < superBloque->numeroInodos; i++) {
-		inodosMemoria[i].inodo=&inodosDisco[i];// Ponemos el puntero
-		inodosMemoria[i].posicion=0;
-		inodosMemoria[i].estado=CERRADO;
-		//printf("indice=%d, posicion=%u, estado=%u, tipo=%d, nombre='%s', tamano=%u\n", i, inodosMemoria[i].posicion, inodosMemoria[i].estado, inodosMemoria[i].inodo->tipo, inodosMemoria[i].inodo->nombre, inodosMemoria[i].inodo->tamano);
-	}
-
-	// Bytes necesarios para el mapa, pueden sobrar, pero siempre menos de CHAR_BIT
-	int bytes = ((unsigned int) sizeof(bits))*PALABRAS_SYNC;
-	mapaSync = malloc(bytes);
-	// Ponemos todo a 0
-	bzero(mapaSync, bytes);
-
-	// Preparamos el estado de los ficheros
-	bzero(estadoFicheros, sizeof(unsigned int) * superBloque->numeroInodos);
-
-	return 0;
-}
-
-/*
- * @brief 	Unmounts the file system from the simulated device.
- * @return 	0 if success, -1 otherwise.
- */
-int unmountFS(void)
-{
-	// Guardamos a disco
-	if (sincronizarDisco() == -1) return -1;
-
-	//Eliminar el estado de los ficheros al desmontar el sistema
-	bzero(estadoFicheros, sizeof(unsigned int) * superBloque->numeroInodos);
-
-	//Liberamos recursos
-	free(superBloque);
-	free(mapaBitsInodos);
-	free(mapaBitsBloquesDatos);
-	free(inodosDisco);
-	free(inodosMemoria);
-	free(mapaSync);
-
-	return 0;
-}
-
 void lsInodo(int in, int listaInodos[10], char listaNombres[10][33])
 {
 	//Creamos el bufer de lectura
@@ -291,6 +177,12 @@ void trocearRuta(char *path, char *resul, char *profundidadSuperior)
 //Casos probados:
 //Básico: /a/b -> dir/fic
 void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
+	if(strcmp(path, "/") == 0){
+		*indicePadre = 0;
+		*indice = 0;
+		strcpy(dirSuperior, "/");
+		return;
+	}
 
 	int cont = 0, invalido = 0;
 	char *rutaCorta = malloc(strlen(path));
@@ -393,6 +285,13 @@ int crearFichero(char *path, int tipo){
 		return -2;
 	}
 
+	if(strcmp(path, "/") == 0){
+		if(i != 0 || b != 0){
+			printf("[ERROR] No se puede crear /, sistema corrupto.\n");
+			return -3;
+		}
+	}
+
 	inodosMemoria[i].inodo->tipo = tipo;
 	strcpy(inodosMemoria[i].inodo->nombre, dirSuperior);
 	inodosMemoria[i].inodo->tamano = 0;
@@ -403,24 +302,28 @@ int crearFichero(char *path, int tipo){
 	bloqueModificado(superBloque->primerInodo);
 
 	char *bufferLectura = malloc(BLOCK_SIZE);
-	if(bread(DEVICE_IMAGE, inodosMemoria[inodoPadre].inodo->bloqueDirecto, bufferLectura) == -1){
-		printf("[ERROR] No se pudo leer el bloque del directorio padre\n");
-		free(bufferLectura);
-		return -2;
-	}
 	char buff[sizeof(FORMATO_LINEA_DIRECTORIO) + 10 + TAMANO_NOMBRE_FICHERO + 1];
-	//Poner nombre del fichero, la direccion es ruta + strlen(dirSuperior) + 1 por la /
-	sprintf(buff, FORMATO_LINEA_DIRECTORIO, i, path + tamNombre + 1);
-	memcpy(bufferLectura + inodosMemoria[inodoPadre].inodo->tamano, buff, sizeof(buff));
 
-	if(bwrite(DEVICE_IMAGE, inodosMemoria[inodoPadre].inodo->bloqueDirecto, bufferLectura) == -1){
-		printf("[ERROR] Error al formatear un bloque\n");
+	//Raiz no tiene padre, entonces no tenemos que modificar
+	if(strcmp(path, "/") != 0){
+		if(bread(DEVICE_IMAGE, inodosMemoria[inodoPadre].inodo->bloqueDirecto, bufferLectura) == -1){
+			printf("[ERROR] No se pudo leer el bloque del directorio padre\n");
+			free(bufferLectura);
+			return -2;
+		}
+		//Poner nombre del fichero, la direccion es ruta + strlen(dirSuperior) + 1 por la /
+		sprintf(buff, FORMATO_LINEA_DIRECTORIO, i, path + tamNombre + 1);
+		memcpy(bufferLectura + inodosMemoria[inodoPadre].inodo->tamano, buff, sizeof(buff));
+
+		if(bwrite(DEVICE_IMAGE, inodosMemoria[inodoPadre].inodo->bloqueDirecto, bufferLectura) == -1){
+			printf("[ERROR] Error al formatear un bloque\n");
+			free(bufferLectura);
+			return -1;
+		}
 		free(bufferLectura);
-		return -1;
-	}
-	free(bufferLectura);
 
-	inodosMemoria[inodoPadre].inodo->tamano += strlen(buff); //Indicar el indice del padre
+		inodosMemoria[inodoPadre].inodo->tamano += strlen(buff); //Indicar el indice del padre
+	}
 
 	if(tipo == DIRECTORIO){
 		//Reset de bufer de escritura
@@ -571,6 +474,123 @@ int eliminarFichero(char *path, int tipo) {
 	}
 
 	free(bufferLectura);
+
+	return 0;
+}
+
+/*
+ * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
+ * @return 	0 if success, -1 otherwise.
+ */
+int mkFS(long deviceSize)
+{
+	//Nos aseguramos de que el tamano del almacenamiento es adecuado
+	if((deviceSize < MIN_TAMANO_DISCO) || (deviceSize > MAX_TAMANO_DISCO)){
+		printf("[ERROR] El tamaño del dispositivo no es adecuado\n");
+		return -1;
+	}
+
+	//Si ya se ha montado el sistema anteriormente, primero desmontamos
+	if(superBloque != NULL){
+		unmountFS();
+	}
+
+	//Necesitamos formatear el dispositivo para evitar interferencias
+	char bloqueFormateado[BLOCK_SIZE];
+	unsigned int cant_bloques=deviceSize/BLOCK_SIZE;
+	bzero(bloqueFormateado, BLOCK_SIZE);
+	for(int i = BLOQUE_PRIMER_DATOS; i < cant_bloques; i++){
+		if(bwrite(DEVICE_IMAGE, i, bloqueFormateado) == -1){
+			printf("[ERROR] Error al formatear un bloque\n");
+			return -1;
+		}
+	}
+
+	superBloque = malloc(sizeof(struct superBloque));
+	superBloque->numeroMagico = NUM_MAGICO;
+	superBloque->numeroBloquesMapaInodos = BLOQUE_BITS_INODOS_NUM;
+	superBloque->numeroBloquesMapaDatos = BLOQUE_BITS_DATOS_NUM;
+	superBloque->numeroInodos = MAX_FICHEROS;
+	superBloque->primerInodo = BLOQUE_PRIMER_INODO;
+	superBloque->primerBloqueDatos = BLOQUE_PRIMER_DATOS;
+	superBloque->numeroBloquesDatos = (unsigned int) (cant_bloques - BLOQUE_PRIMER_DATOS);
+	superBloque->tamanoDispositivo = deviceSize;
+	bzero(superBloque->relleno, PADDING_SB);
+
+	//Creacion de las estructuras estáticas de disco
+	mapaBitsInodos = malloc(sizeof(struct mapaBitsInodos));
+	bzero(mapaBitsInodos, sizeof(struct mapaBitsInodos));
+	mapaBitsBloquesDatos = malloc(sizeof(struct mapaBitsBloquesDatos));
+	bzero(mapaBitsBloquesDatos, sizeof(struct mapaBitsBloquesDatos));
+
+	// sizeof(struct inodo) * MAX_FICHEROS cabe en un bloque
+	inodosDisco = malloc(BLOCK_SIZE);
+	bzero(inodosDisco, BLOCK_SIZE);
+	for (int i=0; i < MAX_FICHEROS; i++) {
+		inodosDisco[i].tipo=FICHERO;
+		strcpy(inodosDisco[i].nombre, "");
+		inodosDisco[i].tamano=0;
+	}
+
+	if(crearFichero("/", DIRECTORIO) < 0){
+		printf("[ERROR] No se ha podido crear el directorio /\n");
+		return -1;
+	}
+
+	// Guardamos a disco
+	if (sincronizarDisco() == -1) return -1;
+
+	return 0;
+}
+
+/*
+ * @brief 	Mounts a file system in the simulated device.
+ * @return 	0 if success, -1 otherwise.
+ */
+int mountFS(void)
+{
+	if (sincronizarMemoria() == -1) return -1;
+
+	// Creamos los inodos de memoria
+	inodosMemoria = malloc((sizeof(struct inodoMemoria) * superBloque->numeroInodos));
+	for (int i=0; i < superBloque->numeroInodos; i++) {
+		inodosMemoria[i].inodo=&inodosDisco[i];// Ponemos el puntero
+		inodosMemoria[i].posicion=0;
+		inodosMemoria[i].estado=CERRADO;
+		//printf("indice=%d, posicion=%u, estado=%u, tipo=%d, nombre='%s', tamano=%u\n", i, inodosMemoria[i].posicion, inodosMemoria[i].estado, inodosMemoria[i].inodo->tipo, inodosMemoria[i].inodo->nombre, inodosMemoria[i].inodo->tamano);
+	}
+
+	// Bytes necesarios para el mapa, pueden sobrar, pero siempre menos de CHAR_BIT
+	int bytes = ((unsigned int) sizeof(bits))*PALABRAS_SYNC;
+	mapaSync = malloc(bytes);
+	// Ponemos todo a 0
+	bzero(mapaSync, bytes);
+
+	// Preparamos el estado de los ficheros
+	bzero(estadoFicheros, sizeof(unsigned int) * superBloque->numeroInodos);
+
+	return 0;
+}
+
+/*
+ * @brief 	Unmounts the file system from the simulated device.
+ * @return 	0 if success, -1 otherwise.
+ */
+int unmountFS(void)
+{
+	// Guardamos a disco
+	if (sincronizarDisco() == -1) return -1;
+
+	//Eliminar el estado de los ficheros al desmontar el sistema
+	bzero(estadoFicheros, sizeof(unsigned int) * superBloque->numeroInodos);
+
+	//Liberamos recursos
+	free(superBloque);
+	free(mapaBitsInodos);
+	free(mapaBitsBloquesDatos);
+	free(inodosDisco);
+	free(inodosMemoria);
+	free(mapaSync);
 
 	return 0;
 }
