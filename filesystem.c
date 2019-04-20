@@ -114,6 +114,11 @@ int mkFS(long deviceSize)
 		return -1;
 	}
 
+	//Si ya se ha montado el sistema anteriormente, primero desmontamos
+	if(superBloque != NULL){
+		unmountFS();
+	}
+
 	//Necesitamos formatear el dispositivo para evitar interferencias
 	char bloqueFormateado[BLOCK_SIZE];
 	unsigned int cant_bloques=deviceSize/BLOCK_SIZE;
@@ -157,8 +162,6 @@ int mkFS(long deviceSize)
 	if (sincronizarDisco() == -1) return -1;
 
 	return 0;
-
-	//TO-DO: POSIBLE UNMOUNT SI EL ACTUAL FS ESTA CARGADO
 }
 
 /*
@@ -199,8 +202,6 @@ int unmountFS(void)
 	// Guardamos a disco
 	if (sincronizarDisco() == -1) return -1;
 
-	//TO-DO: Recorrer estados ficheros para cerrar todos los ficheros abiertos
-
 	//Liberamos recursos
 	free(superBloque);
 	free(mapaBitsInodos);
@@ -208,6 +209,9 @@ int unmountFS(void)
 	free(inodosDisco);
 	free(inodosMemoria);
 	free(mapaSync);
+
+	//Eliminar el estado de los ficheros al desmontar el sistema
+	bzero(estadoFicheros, sizeof(unsigned int) * superBloque->numeroInodos);
 
 	return 0;
 }
@@ -291,11 +295,6 @@ void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 	char copia[strlen(path)];
 	strcpy(copia, "/");
 
-	//	/a/b/f1 (inodosMemoria[indice].inodo->tipo == DIRECTORIO)
-	// func("/a/b/f(no existe)", dir, n)-> dir="/a/b", n=-1
-
-	// func("/a/b/f(existe)", dir, n)-> dir="/a/b", n=inodo de f1
-	//
 	*indicePadre = 0;
 	*indice = -1;
 
@@ -360,7 +359,7 @@ void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 }
 
 //Crea fichero o directorio por ser procedimientos parecidos
-int crearFichero(char *path, int tipo){
+int crearFichero(char *path, int tipo){ //TO-DO
 	/*
 	char buff[sizeof(FORMATO_LINEA_DIRECTORIO) + 10 + TAMANO_NOMBRE_FICHERO + 1];
 	sprintf(buff, FORMATO_LINEA_DIRECTORIO, 3, "nombre");
@@ -431,6 +430,7 @@ int crearFichero(char *path, int tipo){
 	return -2;
 }
 
+//TO-DO: Si es directorio y tiene ficheros, entonces no borramos de momento...
 int eliminarFichero(char *path, int tipo) {
 	char *dirSuperior=malloc(strlen(path));
 	int inodoPadre, inodo;
@@ -634,7 +634,7 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 		return -1;
 	}
 
-	if(fileDescriptor > superBloque->numeroInodos || fileDescriptor < 0 || estadoFicheros[fileDescriptor] == -1){
+	if(fileDescriptor > superBloque->numeroInodos || fileDescriptor < 0 || estadoFicheros[fileDescriptor] == 0){
 		printf("[ERROR] Descriptor de fichero no existente\n");
 		return -1;
 	}
@@ -683,7 +683,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 		return -1;
 	}
 
-	if(fileDescriptor > superBloque->numeroInodos || fileDescriptor < 0 || estadoFicheros[fileDescriptor] == -1){
+	if(fileDescriptor > superBloque->numeroInodos || fileDescriptor < 0 || estadoFicheros[fileDescriptor] == 0){
 		printf("[ERROR] Descriptor de fichero no existente\n");
 		return -1;
 	}
