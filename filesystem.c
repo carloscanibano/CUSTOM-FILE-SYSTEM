@@ -26,6 +26,7 @@ unsigned int estadoFicheros[MAX_FICHEROS];
 unsigned char *mapaSync = NULL;
 
 void bloqueModificado(int bloque) {
+	if (mapaSync == NULL) return;
 	struct indices_bits ib = get_indices_bits(bloque);
 	set_bit(&mapaSync[ib.a], ib.b);
 }
@@ -179,7 +180,7 @@ void trocearRuta(char *path, char *resul, char *profundidadSuperior)
 void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 	if(strcmp(path, "/") == 0){
 		*indicePadre = 0;
-		*indice = 0;
+		*indice = -1;
 		strcpy(dirSuperior, "/");
 		return;
 	}
@@ -252,10 +253,12 @@ int crearFichero(char *path, int tipo){
 	//Tiene que tener . y .. cada directorio al ser creados...
 	//Si es 0 el identificador del inodo, es raiz, . y .. son 0
 	//Varibles para encontar inodo y bloque libre.
-	int i, b;
+	unsigned char esRaiz = (strcmp(path, "/") == 0);
 	char *dirSuperiorAux = malloc(strlen(path));
-	int inodoPadre, inodo;
+	int inodoPadre, inodo, b;
 	infoFichero(path, dirSuperiorAux, &inodoPadre, &inodo);
+
+	//printf("1. infoFichero ha funcionado con valores, %s, %d, %d\n", dirSuperiorAux, inodoPadre, inodo);
 
 	// Pasamos a array para evitarnos hacer free en los muchos errores
 	int tamNombre = strlen(dirSuperiorAux);
@@ -273,11 +276,12 @@ int crearFichero(char *path, int tipo){
 		return -1;
 	}
 
-	i = ialloc();
-	if(i == -1){
+	inodo = ialloc();
+	if(inodo == -1){
 		printf("[ERROR] No se puede crear del fichero, no se puede encontrar un inodo libre.\n");
 		return -2;
 	}
+	printf("ialloc bien\n");
 
 	b = balloc();
 	if(b == -1){
@@ -285,19 +289,25 @@ int crearFichero(char *path, int tipo){
 		return -2;
 	}
 
-	if(strcmp(path, "/") == 0){
-		if(i != 0 || b != 0){
+	//printf("2. inodo y bloque asociados con valor, %d, %d\n", inodo, b);
+
+	if(esRaiz){
+		if(inodo != 0 || b != 0){
 			printf("[ERROR] No se puede crear /, sistema corrupto.\n");
 			return -3;
 		}
 	}
 
-	inodosMemoria[i].inodo->tipo = tipo;
-	strcpy(inodosMemoria[i].inodo->nombre, dirSuperior);
-	inodosMemoria[i].inodo->tamano = 0;
-	inodosMemoria[i].inodo->bloqueDirecto = b;
-	inodosMemoria[i].posicion = 0;
-	inodosMemoria[i].estado = CERRADO;
+	inodosDisco[inodo].tipo = tipo;
+	strcpy(inodosDisco[inodo].nombre, dirSuperior);
+	inodosDisco[inodo].tamano = 0;
+	inodosDisco[inodo].bloqueDirecto = b;
+
+	if(!esRaiz){
+		inodosMemoria[inodo].posicion = 0;
+		inodosMemoria[inodo].estado = CERRADO;
+		inodosMemoria[inodo].inodo = &inodosDisco[inodo];
+	}
 
 	bloqueModificado(superBloque->primerInodo);
 
@@ -305,14 +315,14 @@ int crearFichero(char *path, int tipo){
 	char buff[sizeof(FORMATO_LINEA_DIRECTORIO) + 10 + TAMANO_NOMBRE_FICHERO + 1];
 
 	//Raiz no tiene padre, entonces no tenemos que modificar
-	if(strcmp(path, "/") != 0){
+	if(!esRaiz){
 		if(bread(DEVICE_IMAGE, inodosMemoria[inodoPadre].inodo->bloqueDirecto, bufferLectura) == -1){
 			printf("[ERROR] No se pudo leer el bloque del directorio padre\n");
 			free(bufferLectura);
 			return -2;
 		}
 		//Poner nombre del fichero, la direccion es ruta + strlen(dirSuperior) + 1 por la /
-		sprintf(buff, FORMATO_LINEA_DIRECTORIO, i, path + tamNombre + 1);
+		sprintf(buff, FORMATO_LINEA_DIRECTORIO, inodo, path + tamNombre + 1);
 		memcpy(bufferLectura + inodosMemoria[inodoPadre].inodo->tamano, buff, sizeof(buff));
 
 		if(bwrite(DEVICE_IMAGE, inodosMemoria[inodoPadre].inodo->bloqueDirecto, bufferLectura) == -1){
@@ -329,7 +339,7 @@ int crearFichero(char *path, int tipo){
 		//Reset de bufer de escritura
 		bzero(buff, strlen(buff));
 		//Creamos el bufer necesario para escribir el "." en el directorio
-		sprintf(buff, FORMATO_LINEA_DIRECTORIO, i, ".");
+		sprintf(buff, FORMATO_LINEA_DIRECTORIO, inodo, ".");
 		//Reset de bufer de lectura
 		bzero(bufferLectura, BLOCK_SIZE);
 		//Anadir "."
@@ -340,13 +350,13 @@ int crearFichero(char *path, int tipo){
 		//Anadir ".."
 		memcpy(bufferLectura + tamNombre, buff, sizeof(buff));
 		//Escribimos buff sin desplazamiento por estar el bloque vacio, "."
-		if(bwrite(DEVICE_IMAGE, inodosMemoria[i].inodo->bloqueDirecto, bufferLectura) == -1){
+		if(bwrite(DEVICE_IMAGE, inodosDisco[inodo].bloqueDirecto, bufferLectura) == -1){
 			printf("[ERROR] Error al formatear un bloque\n");
 			free(bufferLectura);
 			return -2;
 		}
 		//Modificamos el tamano del directorio creado ahora mismo
-		inodosMemoria[i].inodo->tamano += strlen(buff) + tamNombre;
+		inodosDisco[inodo].tamano += strlen(buff) + tamNombre;
 		free(bufferLectura);
 	}
 
@@ -568,6 +578,8 @@ int mountFS(void)
 
 	// Preparamos el estado de los ficheros
 	bzero(estadoFicheros, sizeof(unsigned int) * superBloque->numeroInodos);
+
+	//inodosMemoria[0];
 
 	return 0;
 }
