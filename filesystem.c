@@ -22,6 +22,8 @@ struct inodo *inodosDisco = NULL;
 struct inodoMemoria *inodosMemoria = NULL;
 // El indice es el descriptor y inodo es el valor guardado
 unsigned int estadoFicheros[MAX_FICHEROS];
+//Variables para controlar el contenido maximo del directorio
+//unsigned int contenidoDirectorio[MAX_FICHEROS]; //TO-DO
 // Para saber si es necesario guardar en disco tenemos un mapa de bits, 1 significa que esta desactualizado
 unsigned char *mapaSync = NULL;
 
@@ -250,12 +252,13 @@ void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 					//Si hay mas ruta es que la ruta no es valida
 					//printf("rutaCorta antes de hacer if maldito: %s\n\n", rutaCorta);
 					//printf("llego\n");
-					//printf("%s\n", rutaCorta);
+					//printf("Contenido rutaCorta: %s\n", rutaCorta);
+					//printf("Antes linea maldita\n");
 					if((strcmp(rutaCorta, "") != 0)){
 						//printf("No deberiamos entrar aqui\n\n");
 						invalido = 1;
 					}else{
-						//printf("llego\n");
+						//printf("Paso la linea maldita\n");
 						//Tenemos el indice del padre, pero no encontramos el que queremos crear
 						*indicePadre = cont;
 					}
@@ -306,13 +309,13 @@ int crearFichero(char *path, int tipo){
 		traza("[ERROR] No se puede crear del fichero, no se puede encontrar un inodo libre.\n");
 		return -2;
 	}
-	printf("crearFichero Inodo %d\n", inodo);
+	//printf("crearFichero Inodo %d\n", inodo);
 	b = balloc();
 	if(b == -1){
 		traza("[ERROR] No se puede crear del fichero, no se puede encontrar un bloque libre.\n");
 		return -2;
 	}
-	printf("crearFichero Bloque %d\n", b);
+	//printf("crearFichero Bloque %d\n", b);
 
 	//printf("2. inodo y bloque asociados con valor, %d, %d\n", inodo, b);
 
@@ -362,7 +365,7 @@ int crearFichero(char *path, int tipo){
 			free(bufferLectura);
 			return -1;
 		}
-		free(bufferLectura);
+		//free(bufferLectura);
 
 		inodosMemoria[inodoPadre].inodo->tamano += strlen(buff);
 		//printf("Tamaño: %d\n", inodosMemoria[inodoPadre].inodo->tamano);
@@ -391,8 +394,9 @@ int crearFichero(char *path, int tipo){
 		}
 		//Modificamos el tamano del directorio creado ahora mismo
 		inodosDisco[inodo].tamano += strlen(buff) + tamNombre;
-		if (esRaiz) free(bufferLectura);
+		//if (esRaiz) free(bufferLectura);
 	}
+	free(bufferLectura);
 	return 0;
 }
 
@@ -635,14 +639,15 @@ int unmountFS(void)
 {
 	// Guardamos a disco
 	if (sincronizarDisco() == -1) return -1;
-
 	// Leer bloques para comprobar las entradas de directorio
+	/*
 	char *buff=malloc(BLOCK_SIZE);
 	if(bread(DEVICE_IMAGE, 5, buff) == -1){// Leer el directorio /a
 		traza("[ERROR] No se pueden leer la prueba\n");
 		return -1;
 	}
 	printf("-%s-", buff);
+	*/
 
 	//Eliminar el estado de los ficheros al desmontar el sistema
 	bzero(estadoFicheros, sizeof(unsigned int) * superBloque->numeroInodos);
@@ -689,6 +694,9 @@ int openFile(char *path)
 	infoFichero(path, dirSuperior, &inodoPadre, &inodo);
 	free(dirSuperior);
 
+	//printf("Inodo padre de f1: %d\n", inodoPadre);
+	//printf("Inodo de f1: %d\n", inodo);
+
 	if (inodoPadre < 0) {
 		traza("[ERROR] Ruta invalida.\n");
 		return -2;
@@ -711,7 +719,7 @@ int openFile(char *path)
 
 	int fd = -1;
 	for (int i = 0; i < superBloque->numeroInodos; i++) {
-		if (estadoFicheros[i] == inodo) {
+		if (estadoFicheros[i] == 0) {
 			fd = i;
 			break;
 		}
@@ -726,6 +734,7 @@ int openFile(char *path)
 
 	estadoFicheros[fd] = inodo;
 	inodosMemoria[inodo].estado = ABIERTO;
+	inodosMemoria[inodo].posicion = 0;
 
 	return fd;
 }
@@ -770,8 +779,6 @@ int closeFile(int fileDescriptor)
  */
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
-	int resul;
-
 	//Comprobar errores
 	if(numBytes > BLOCK_SIZE || numBytes < 0){
 		traza("[ERROR] Numero de bytes a leer fuera de limites\n");
@@ -788,10 +795,11 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 	//Si nos salimos de nuestro bloque, el fin del bloque es nuestra posicion
 	if(numBytes > BLOCK_SIZE - inodo->posicion){
 		numBytes = (BLOCK_SIZE - inodo->posicion);
-		buferLectura= malloc(numBytes);
+		buferLectura = malloc(numBytes);
 	}else{
-		buferLectura = malloc(numBytes - inodo->posicion);
+		buferLectura = malloc(numBytes);
 	}
+	bzero(buferLectura, numBytes);
 
 	//Posicion a partir de la cual tenemos que leer
 	if (inodo->posicion >= BLOCK_SIZE - 1){
@@ -799,18 +807,19 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 		return 0;
 	}
 	//Leemos del sistema de ficheros
-	resul = bread(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferLectura);
-	if(resul == -1){
+	if(bread(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferLectura) == -1){
 		free(buferLectura);
 		traza("[ERROR] No se puede leer del fichero\n");
 		return -1;
 	}
 
-	memcpy(buffer, buferLectura, resul);
-	inodo->posicion += resul;
+	memcpy(buffer, buferLectura + inodo->posicion, numBytes);
+	printf("Contenido de buffer: %s\n\n", (char *) buffer);
+	printf("Tamano de buffer: %ld\n\n", strlen((char *) buffer));
+	inodo->posicion += numBytes;
 	free(buferLectura);
 
-	return resul;
+	return strlen((char *) buffer);
 }
 
 /*
@@ -819,8 +828,6 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int writeFile(int fileDescriptor, void *buffer, int numBytes)
 {
-	int resul;
-
 	//Comprobar errores
 	if(numBytes > BLOCK_SIZE || numBytes < 0){
 		traza("[ERROR] Numero de bytes a escribir fuera de limites\n");
@@ -841,23 +848,35 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	if (inodo->posicion >= BLOCK_SIZE - 1){
 		return 0;
 	}
+
 	char *buferEscritura = malloc(BLOCK_SIZE);
+	bzero(buferEscritura, BLOCK_SIZE);
+	if(bread(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferEscritura) == -1){
+		free(buferEscritura);
+		traza("[ERROR] No se puede leer el fichero\n");
+		return -1;
+	}
+	//bzero(buferEscritura, BLOCK_SIZE);
+	printf("Contenido buferEscritura: %s\n\n", buferEscritura);
 	//Escribimos en el sistema de ficheros
-	memcpy(buferEscritura + inodo->posicion, buffer, numBytes);
-	resul = bwrite(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferEscritura);
-	if(resul == -1){
+	memcpy(buferEscritura + inodo->inodo->tamano, buffer, numBytes);
+	//printf("Contenido buferEscritura: %s\n\n", buferEscritura);
+	if(bwrite(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferEscritura) == -1){
 		free(buferEscritura);
 		traza("[ERROR] No se puede escribir en el fichero\n");
 		return -1;
 	}
 
-	resul = numBytes;
+	char buferLectura[BLOCK_SIZE];
+	bread(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferLectura);
+	printf("Contenido buferLectura despues escribir: -%s-\n\n", buferLectura);
+
 	inodo->inodo->tamano += numBytes;
-	inodo->posicion += numBytes;
+	//inodo->posicion += numBytes;
 
 	bloqueModificado(superBloque->primerInodo);
 
-	return resul;
+	return numBytes;
 }
 
 /*
@@ -879,7 +898,7 @@ int lseekFile(int fileDescriptor, long offset, int whence)
 	int nuevaPosicion = inodosMemoria[fileDescriptor].posicion + offset;
 	switch (whence) {
 		case FS_SEEK_CUR:
-			if (nuevaPosicion < 0 || nuevaPosicion > inodosMemoria[fileDescriptor].inodo->tamano)
+			if (nuevaPosicion < 0 || nuevaPosicion >= inodosMemoria[fileDescriptor].inodo->tamano)
 				return -1;
 			else inodosMemoria[fileDescriptor].posicion = nuevaPosicion;
 		break;

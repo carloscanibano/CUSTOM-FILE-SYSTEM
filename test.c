@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 #include "include/filesystem.h"
 #include "include/metadata.h"
 
@@ -46,169 +45,143 @@ int desmontar() {
 	return 0;
 }
 
-int crearArchivo() {
-	ret = createFile("/a/b/c");
-	if (ret != 0)
-	{
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+void imprimirContenidoFichero(int inodo){
 
-	ret = createFile("/a/b/c");
-	if (ret != 0)
-	{
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-
-	ret = createFile("/a/c");
-	if (ret != 0)
-	{
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-
-	ret = createFile("/c/f");
-	if (ret != 0)
-	{
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	return 0;
 }
-int crearDirectorio(){
 
-	for(int i = 1; i<50; i++){
+int crearDirectorio() {
+	/*
+	for(int i = 0; i < 15; i++){
 		char buffer[128];
-		snprintf(buffer, sizeof(buffer), "%s%d", "/f", i);
-		ret = mkDir(buffer);
-		printf("%d\n", i);
-		if (ret != 0)
-		{
-			fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkDir ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		snprintf(buffer, sizeof(buffer), "%s%d", "/f", i + 10);
+		ret = createFile(buffer);
+		if (ret != 0){
+			fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
 			return -1;
 		}
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkDir ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 	}
-
-	ret = mkDir("/a/b/c/d");
-	if (ret != 0)
-	{
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkDir ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+	return 0;
+	*/
+	ret = mkDir("/a");
+	if (ret != 0){
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkdir1 ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkDir ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkdir1 ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 
 	ret = mkDir("/a/b");
-	if (ret != 0)
-	{
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkDir ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+	if (ret != 0){
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkdir2 ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkDir ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-
-	ret = mkDir("/c");
-	if (ret != 0)
-	{
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkDir ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkDir ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkdir2 ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 	return 0;
 }
 
-int testsEliminar() {
-/*
-/
-	a
-		aa
-			aaa
-			aaf
-		af
-	b
-	f
-*/
-	ret=mkDir("/a");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
+int crearArchivo(char *path) {
+	/*
+	for(int i = 0; i < 15; i++){
+		char buffer[128];
+		snprintf(buffer, sizeof(buffer), "%s%d", "/f", i + 10);
+		ret = createFile(buffer);
+		if (ret != 0){
+			fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+			return -1;
+		}
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	ret=mkDir("/a/aa");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	ret=createFile("/a/af");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/af ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/af ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	ret=mkDir("/a/aa/aaa");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaa ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaa ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	ret=createFile("/a/aa/aaf");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaf ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaf ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-
-	ret=mkDir("/b");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /b ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /b ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-
-	ret=createFile("/f");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /f ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /f ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-
-	printf("---------Empiezo a borrar\n");
-
-	// TODO meter comprobacion si cuando delDir es Dir y delFich es Fich, lo mismo en crear
-	ret=removeFile("/a/af");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "elimino /a/af ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "elimino /a/af ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	//Para ver si coge los mismos inodo y bloque (al no haber creaciones encima)
-	ret=createFile("/a/af");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/af ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/af ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-
 	return 0;
+	*/
+	ret = createFile(path);
+	if (ret != 0){
+		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", path, ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", path, ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	return 0;
+}
+
+int abrirFichero(char *path) {
+	ret = openFile(path);
+	if (ret != 0){
+		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST openFile ", path, ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST openFile ", path, ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	return ret;
+}
+
+int cerrarFichero(int fd) {
+	ret = closeFile(fd);
+	if (ret != 0){
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST closeFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST closeFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	return 0;
+}
+
+int leerFichero(int fd){
+	int bytesLeidos, bytesLeer = 5;
+	char buferLectura[5];
+	bytesLeidos = readFile(fd, buferLectura, bytesLeer);
+	if (bytesLeidos < 0){
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST readFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST readFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	return bytesLeidos;
+}
+
+int escribirFichero(int fd){
+	int bytesEscritos, bytesEscribir = 10;
+	char buferEscritura[11];
+	strcpy(buferEscritura, "nardonardo");
+	bytesEscritos = writeFile(fd, buferEscritura, bytesEscribir);
+	if (bytesEscritos == 0){
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST writeFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST writeFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	return bytesEscritos;
 }
 
 int main()
 {
+	int fd, bytesLeidos, bytesEscritos;
+
+	/*
+	printf("Makeo\n");
 	if (mk()==-1) return -1;
-
+	*/
+	printf("Monto\n");
 	if (montar()==-1) return -1;
+	/*
+	printf("Crear directorios /a y /a/b en /\n");
+	if (crearDirectorio()==-1) return -1;
+	*/
+	printf("Creando 1 fichero en /f\n");
+	if (crearArchivo("/f")==-1) return -1;
 
-	printf("\n\n\n---------- testsEliminar ----------\n");
-	if (testsEliminar()==-1) return -1;
-	printf("---------- testsEliminar ----------\n\n\n");
+	printf("Abrir fichero /f1\n");
+	fd = abrirFichero("/f");
+	if (fd==-1) return -1;
 
+	printf("Escribimos 10 bytes de /a/b/f1\n");
+	bytesEscritos = escribirFichero(fd);
+	if (bytesEscritos==-1) return -1;
+	printf("Numero de bytes escritos: %d\n\n", bytesEscritos);
+
+	printf("Leemos 10 bytes de /a/b/f1\n");
+	bytesLeidos = leerFichero(fd);
+	if (bytesLeidos==-1) return -1;
+	printf("Numero de bytes leidos: %d\n\n", bytesLeidos);
+
+	printf("Cerrar fichero /f1\n");
+	if (cerrarFichero(fd)==-1) return -1;
+
+	printf("Desmonto\n");
 	if (desmontar()==-1) return -1;
 
 	return 0;
