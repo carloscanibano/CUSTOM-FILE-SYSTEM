@@ -27,7 +27,7 @@ unsigned char *mapaSync = NULL;
 
 void traza(char *str){
 	#ifdef DEBUG
-		printf("%s\n", str);
+		printf("%s", str);
 	#endif
 }
 
@@ -136,7 +136,6 @@ int sincronizarMemoria() {
 
 void lsInodo(int in, int listaInodos[10], char listaNombres[10][33])
 {
-	//Creamos el bufer de lectura
 	char *buferLectura = memoria(BLOCK_SIZE);
 	//Leemos del sistema de ficheros el bloque correspondiente
 	if(bread(DEVICE_IMAGE, inodosMemoria[in].inodo->bloqueDirecto, buferLectura) == -1){
@@ -144,35 +143,43 @@ void lsInodo(int in, int listaInodos[10], char listaNombres[10][33])
 		free(buferLectura);
 		return;
 	}
-	//Creamos datos adicionales para sacar los tokens
-	int contador = 0;
-	int contadorInodos = 0;
-	int contadorNombres = 0;
-	char copia[256];
-	char *ptr;
-	strcpy(copia, buferLectura);
-	//Especificamos como separadores el espacio y el \n
-	ptr = strtok(copia, " \n");
-	while(ptr != NULL){
-		//Los fragmentos pares siempre son el numero de inodo
-		if(contador % 2 == 0){
-			listaInodos[contadorInodos] = atoi(ptr);
-			contadorInodos++;
-		//Los fragmentos impares siempre son el nombre del fichero/directorio
-		}else{
-			strcpy(listaNombres[contadorNombres], ptr);
-			contadorNombres++;
+	char *token = strtok(buferLectura, "\n");
+	unsigned char tamInteger=10, tamLinea, i, bandera, cNombre, iResul = 0;
+	char inodoStr[tamInteger];
+
+	while(token != NULL) {
+		// Reseteamos el inodoStr y nombre
+		for (i=0; i < tamInteger; i++) inodoStr[i]='\0';
+		for (i=0; i < 33; i++) listaNombres[iResul][i]='\0';
+
+		// Cogemos el inodo y nombre
+		tamLinea = strlen(token);
+		bandera = 0;// Cuando valga 1 empezamos a guardar el nombre
+		cNombre = 0;// Indice del string nombre
+		for (i=0; i < tamLinea; i++) {
+			if (token[i] == ' ') {
+				bandera = 1;
+				continue;
+			}
+			if (bandera == 0) {
+				inodoStr[i]=token[i];
+			} else {
+				listaNombres[iResul][cNombre]=token[i];
+				cNombre++;
+			}
 		}
-		ptr = strtok(NULL, " \n");
-		contador++;
+		listaInodos[iResul] = atoi(inodoStr);
+		iResul++;
+
+		token = strtok(NULL, "\n");
 	}
+	free(buferLectura);
+
 	//Rellenamos el resto de casillas de las listas con -1 y con "" respectivamente
-	for(int i = contador/2; i < 10; i++){
+	for (i = iResul; i < 10; i++) {
 		listaInodos[i] = -1;
 		strcpy(listaNombres[i], "");
 	}
-	//Liberamos el bufer de lectura
-	free(buferLectura);
 }
 
 //Acorta en un nivel la ruta proporcionada y retorna el primer elemento
@@ -441,46 +448,31 @@ int eliminarFichero(char *path, int tipo) {
 		return -3;
 	}
 
-	if(ifree(inodo) == -1){
-		traza("[ERROR] No se puede borrar el fichero, error al liberar el inodo.\n");
-		return -2;
-	}
-
-	if(bfree(inodosMemoria[inodo].inodo->bloqueDirecto) == -1){
-		traza("[ERROR] No se puede borrar el fichero, error al liberar el bloque.\n");
-		return -2;
-	}
-
-	char *bufferLectura = memoria(BLOCK_SIZE);
+	//printf("--%s--\n", entradasPadre);
 	// Si es directorio y tiene ficheros, entonces no borramos y error
 	if (tipo == DIRECTORIO) {
-		if(bread(DEVICE_IMAGE, inodosMemoria[inodo].inodo->bloqueDirecto, bufferLectura) == -1){
-			free(bufferLectura);
-			traza("[ERROR] No se pudo leer el directorio que lo contiene.\n");
+		char *entradas = memoria(BLOCK_SIZE);
+		if(bread(DEVICE_IMAGE, inodosMemoria[inodo].inodo->bloqueDirecto, entradas) == -1){
+			free(entradas);
+			traza("[ERROR] al leer un bloque.\n");
 			return -2;
 		}
-		// Si encontramos mas de 2 \n, significa que hay entradas
-		// en el directorio (las 2 son por el . y ..)
+		// Si encontramos mas de 2 (por el . y ..) \n, significa que hay entradas en el directorio
 		int c = 0;
 		for (int i = 0; i < BLOCK_SIZE; i++) {
-			if (bufferLectura[i] == '\n') {
+			if (entradas[i] == '\n') {
 				c++;
 				// Paramos porque no hace falta leer mas
 				if (c > 2) break;
 			}
 		}
+		free(entradas);
 
 		if (c > 2) {
 			traza("[ERROR] El directorio a borrar tiene contenido.\n");
 			return -2;
 		}
 	}
-	free(bufferLectura);
-
-	// Reseteamos el inodo
-	inodosMemoria[inodo].inodo->tipo=FICHERO;
-	strcpy(inodosMemoria[inodo].inodo->nombre, "");
-	inodosMemoria[inodo].inodo->tamano=0;
 
 	bloqueModificado(superBloque->primerInodo);
 
@@ -491,21 +483,19 @@ int eliminarFichero(char *path, int tipo) {
 		traza("[ERROR] Error al formatear un bloque\n");
 		return -2;
 	}
-	free(bufferEscritura);
 
-	// Leer las entradas del directorio padre
-	bufferLectura = memoria(BLOCK_SIZE);
-	if(bread(DEVICE_IMAGE, inodosMemoria[inodoPadre].inodo->bloqueDirecto, bufferLectura) == -1){
-		free(bufferLectura);
-		traza("[ERROR] No se pudo leer el directorio que lo contiene\n");
+	// Leer las entradas del padre
+	char *entradasPadre = memoria(BLOCK_SIZE);
+	if(bread(DEVICE_IMAGE, inodosMemoria[inodoPadre].inodo->bloqueDirecto, entradasPadre) == -1){
+		free(entradasPadre);
+		traza("[ERROR] al leer un bloque.\n");
 		return -2;
 	}
-
 	// Eliminar la entrada del padre
 	unsigned int inodoEncontrado;
-	bufferEscritura = memoria(BLOCK_SIZE);
-	char *token = strtok(bufferLectura, "\n");
-	unsigned char tam=10, tam2, i;
+	bzero(bufferEscritura, BLOCK_SIZE);
+	char *token = strtok(entradasPadre, "\n");
+	unsigned char tam=10, tam2, i, sizeEntradas=0;
 	char inodoStr[tam];
 
 	while(token != NULL) {
@@ -518,21 +508,36 @@ int eliminarFichero(char *path, int tipo) {
 			inodoStr[i]=token[i];
 		}
 		inodoEncontrado=atoi(inodoStr);
-		// Si es un inodo diferente lo metemos en el auxiliar
+		// En el auxiliar meteremos los que no hay que borrar
 		if (inodo != inodoEncontrado) {
 			strcat(bufferEscritura, token);
 			strcat(bufferEscritura, "\n");
+		} else {// Si lo encontramos, contamos los caracteres que hemos "borrado" (no annadido)
+			sizeEntradas += 1 + strlen(token);
 		}
 		token = strtok(NULL, "\n");
 	}
-	free(bufferLectura);
+	free(entradasPadre);
 
+	// Escribir las entradas del padre
 	if(bwrite(DEVICE_IMAGE, inodosMemoria[inodoPadre].inodo->bloqueDirecto, bufferEscritura) == -1){
 		free(bufferEscritura);
-		traza("[ERROR] No se pudo escribir el directorio que lo contiene\n");
+		traza("[ERROR] No se pudo escribir un bloque\n");
 		return -2;
 	}
 	free(bufferEscritura);
+	// Quitamos los caracteres que ocupaban la/s entrada/s
+	inodosMemoria[inodoPadre].inodo->tamano -= sizeEntradas;
+
+	if(ifree(inodo) == -1){
+		traza("[ERROR] No se puede borrar el fichero, error al liberar el inodo.\n");
+		return -2;
+	}
+
+	if(bfree(inodosMemoria[inodo].inodo->bloqueDirecto) == -1){
+		traza("[ERROR] No se puede borrar el fichero, error al liberar el bloque.\n");
+		return -2;
+	}
 
 	return 0;
 }
@@ -940,30 +945,50 @@ int rmDir(char *path)
 //TO DO: Probar bien la recursividad en listar directorios
 int lsDirAuxiliar(char* path, int indice, int listaInodos[10], char listaNombres[10][33]){
 	//Condicion de parada, no queda mas ruta
-	if(strcmp(path, "") == 0){
+	if((strcmp(path, "") == 0) || (strcmp(path, "/") == 0)){
+		//printf("Criterio de parada alcanzado\n");
+		lsInodo(indice, listaInodos, listaNombres);
 		int i;
 		for(i = 0; i < 10; i++){
-			if(listaInodos[i] != -1){
-				i--;
+			if(listaInodos[i] == -1){
 				break;
 			}
 			printf("%d %s\n", listaInodos[i], listaNombres[i]);
 		}
-		//Empezamos el bucle en 0
-		return i + 1;
+		//Tenemos que quitar "." y ".."
+		return i - 2;
 	}
+	//bzero(listaInodos, sizeof(int) * 10);
+	//bzero(listaNombres, sizeof(char) * 10 * 33);
 	lsInodo(indice, listaInodos, listaNombres);
+	/*
+	for(int i = 0; i < 10; i++){
+		if(listaInodos[i] == -1) break;
+		printf("Inodo contenido en indice %d: %d\n", indice, listaInodos[i]);
+		printf("Nombre contenido en indice %d: %s\n", indice, listaNombres[i]);
+	}
+	*/
 	char *profundidadSuperior = memoria(TAMANO_NOMBRE_FICHERO + 1);
 	char *resul = memoria(strlen(path));
 	trocearRuta(path, resul, profundidadSuperior);
+
+	//printf("Ruta: %s\n", path);
+	//printf("Resultado: %s\n", resul);
+	//printf("Profundidad superior: %s\n", profundidadSuperior);
+	
 	char rutaCorta[strlen(path)];
 	strcpy(rutaCorta, resul);
 	free(resul);
+
 	for(int i = 0; i < 10; i++){
 		if((strcmp(listaNombres[i], profundidadSuperior) == 0) &&
 			(inodosMemoria[listaInodos[i]].inodo->tipo == DIRECTORIO)){
+			//printf("Encontrado directorio en profundidadSuperior\n");
+			//printf("El indice del directorio encontrado es: %d\n", listaInodos[i]);
 			indice = listaInodos[i];
 			break;
+		}else{
+			indice = -1;
 		}
 	}
 	free(profundidadSuperior);
@@ -980,6 +1005,10 @@ int lsDirAuxiliar(char* path, int indice, int listaInodos[10], char listaNombres
  */
 int lsDir(char *path, int inodesDir[10], char namesDir[10][33])
 {
+	if(strcmp(path, "") == 0){
+		printf("[ERROR] La ruta de lectura no puede estar vacia\n");
+		return -1;
+	}
 	int numeroElementos = 0;
 	int listaInodos[10];
 	char listaNombres[10][33];
@@ -1051,7 +1080,6 @@ int ifree(int i)
 		return -1;
 	}
 
-	bzero(inodosMemoria[i].inodo->nombre, TAMANO_NOMBRE_FICHERO);
 	struct indices_bits ib=get_indices_bits(i);
 	clear_bit(&mapaBitsInodos->mapa[ib.a], ib.b);
 	//Sincronizamos los mapas de bits

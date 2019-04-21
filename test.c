@@ -80,7 +80,6 @@ int crearDirectorio() {
 }
 
 int crearArchivo(char *path) {
-	/*
 	for(int i = 0; i < 15; i++){
 		char buffer[128];
 		snprintf(buffer, sizeof(buffer), "%s%d", "/f", i + 10);
@@ -92,7 +91,7 @@ int crearArchivo(char *path) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 	}
 	return 0;
-	*/
+	/*
 	ret = createFile(path);
 	if (ret != 0){
 		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", path, ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
@@ -100,18 +99,19 @@ int crearArchivo(char *path) {
 	}
 	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", path, ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 	return 0;
+	*/
 }
 
 int estructuraPrueba(){
-	/*
-/
-	a
-		aa
-			aaa
-			aaf
-		af
-	b
-	f
+/*
+/ (0,4)
+	a (1,5)
+		aa (2,6)
+			aaa (4,8)
+			aaf (5,9)
+		af (3,7)
+	b (6,10)
+	f (7,11)
 */
 	ret=mkDir("/a");
 	if (ret != 0) {
@@ -157,6 +157,72 @@ int estructuraPrueba(){
 		return -1;
 	}
 	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /f ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	return 0;
+}
+
+void imprimirBloque(int b) {
+	char *buff = malloc(BLOCK_SIZE);
+	bzero(buff, BLOCK_SIZE);
+	if(bread(DEVICE_IMAGE, b, buff) == -1)
+		printf("[ERROR] al imprimir el bloque\n");
+	printf("BLOQUE %d:\n-%s-\n", b, buff);
+	free(buff);
+}
+
+int testEliminar() {
+	if (estructuraPrueba()==-1) return -1;
+	printf("Estructura de prueba creada\n\n\n");
+
+	char *arr;
+
+	/*imprimirBloque(4);
+	arr="/f";
+	ret=removeFile(arr);// Funciona
+	if (ret < 0){
+		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST removeFile ", arr, ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST removeFile ", arr, ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);
+	imprimirBloque(4);
+	crearArchivo(arr);
+	imprimirBloque(4);*/
+
+	/*arr="/f";
+	ret=rmDir(arr);// Funciona, no se puede borrar un directorio que sea fichero
+	if (ret < 0){
+		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);*/
+
+	/*arr="/a";
+	ret=rmDir(arr);// Funciona, no se puede borrar porque tiene contenido
+	if (ret < 0){
+		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);*/
+
+	/*imprimirBloque(6);
+	arr="/a/aa/aaa";
+	ret=rmDir(arr);// Funciona
+	if (ret < 0){
+		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);
+	imprimirBloque(6);*/
+
+	/*arr="/b/a";
+	ret=rmDir(arr);// Funciona
+	if (ret < 0){
+		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);*/
+
+	//imprimirBloque(4);
+
 	return 0;
 }
 
@@ -206,7 +272,17 @@ int escribirFichero(int fd){
 }
 
 int listarDirectorio(char *path){
-	return 1;
+	int numeroElementos;
+	int inodosDirectorio[10];
+	char nombresDirectorio[10][33];
+	numeroElementos = lsDir(path, inodosDirectorio, nombresDirectorio);
+	printf("Numero de elementos del directorio: %d\n\n", numeroElementos);
+	if (numeroElementos < 0){
+		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST lsDir ", path, ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST lsDir ", path, ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	return numeroElementos;
 }
 
 int main()
@@ -219,16 +295,20 @@ int main()
 
 	printf("Monto\n");
 	if (montar()==-1) return -1;
-
+	///*
 	printf("Prueba muchos ficheros\n");
 	if (estructuraPrueba()==-1) return -1;
+	// /a tiene aa y af
+	printf("Listar directorios\n");
+	if (listarDirectorio("/")==-1) return -1;
+	//*/
 	/*
 	printf("Crear directorios /a y /a/b en /\n");
 	if (crearDirectorio()==-1) return -1;
 	*/
 	/*
-	printf("Creando 1 fichero en /f\n");
-	if (crearArchivo("/f")==-1) return -1;
+	printf("Creando 15 ficheros en /\n");
+	if (crearArchivo("/")==-1) return -1;
 	*/
 	/*
 	printf("Abrir fichero /f1\n");
