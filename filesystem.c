@@ -206,11 +206,64 @@ void trocearRuta(char *path, char *resul, char *profundidadSuperior)
 	strcpy(profundidadSuperior, ptr);
 }
 
+int lsDirAuxiliar(char* path, int indice, int listaInodos[10], char listaNombres[10][33]){
+	//Condicion de parada, no queda mas ruta
+	if((strcmp(path, "") == 0) || (strcmp(path, "/") == 0)){
+		//printf("Criterio de parada alcanzado\n");
+		lsInodo(indice, listaInodos, listaNombres);
+		int i;
+		for(i = 0; i < 10; i++)
+			if(listaInodos[i] == -1) break;
+		//Tenemos que quitar "." y ".."
+		return i - 2;
+	}
+	//bzero(listaInodos, sizeof(int) * 10);
+	//bzero(listaNombres, sizeof(char) * 10 * 33);
+	lsInodo(indice, listaInodos, listaNombres);
+	/*
+	for(int i = 0; i < 10; i++){
+		if(listaInodos[i] == -1) break;
+		printf("Inodo contenido en indice %d: %d\n", indice, listaInodos[i]);
+		printf("Nombre contenido en indice %d: %s\n", indice, listaNombres[i]);
+	}
+	*/
+	char *profundidadSuperior = memoria(TAMANO_NOMBRE_FICHERO + 1);
+	char *resul = memoria(strlen(path));
+	trocearRuta(path, resul, profundidadSuperior);
+
+	//printf("Ruta: %s\n", path);
+	//printf("Resultado: %s\n", resul);
+	//printf("Profundidad superior: %s\n", profundidadSuperior);
+	
+	char rutaCorta[strlen(path)];
+	strcpy(rutaCorta, resul);
+	free(resul);
+
+	for(int i = 0; i < 10; i++){
+		if((strcmp(listaNombres[i], profundidadSuperior) == 0) &&
+			(inodosMemoria[listaInodos[i]].inodo->tipo == DIRECTORIO)){
+			//printf("Encontrado directorio en profundidadSuperior\n");
+			//printf("El indice del directorio encontrado es: %d\n", listaInodos[i]);
+			indice = listaInodos[i];
+			break;
+		}else{
+			indice = -1;
+		}
+	}
+	free(profundidadSuperior);
+	if(indice == -1){
+		//traza("[ERROR] No se encontro el directorio externo de la ruta\n");
+		return -1;
+	}
+	return lsDirAuxiliar(rutaCorta, indice, listaInodos, listaNombres);
+}
+
 //Devuelve  si existe la ruta especificada, un 0 en caso contrario
 //En el caso de ruta "/" dirSuperior es "/", indicePadre = 0, indice = 0
 //Casos probados:
 //Básico: /a/b -> dir/fic
 void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
+	//El directorio "/" no tiene padre y tratamos el indice de manera especial
 	if(strcmp(path, "/") == 0){
 		*indicePadre = 0;
 		*indice = -1;
@@ -218,72 +271,53 @@ void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 		return;
 	}
 
-	int cont = 0, invalido = 0;
-	char *rutaCorta = memoria(strlen(path));
-	strcpy(rutaCorta, path);
-	int listaInodos[10];
-	char listaNombres[10][33];
+	unsigned int tamanoPath = strlen(path);
 
-	*indicePadre = 0;
-	*indice = -1;
-	while((strcmp(rutaCorta, "") != 0) && (!invalido)){
-		//Comprobar que en al ruta no haya malas consideraciones
-		if((inodosMemoria[cont].inodo->tipo != DIRECTORIO) && (strcmp(rutaCorta, "") != 0)){
-			invalido = 1;
-			break;
-		}
-		//printf("%s\n", rutaCorta);
-		//traza("Hemos comprobado que el padre es directorio y la ruta no ha terminado\n\n");
-		trocearRuta(rutaCorta, rutaCorta, dirSuperior);
-		//printf("%s\n", rutaCorta);
-		//Comprobamos que la ruta solo sea /
-		if((strcmp(dirSuperior, "/") == 0) && (strcmp(rutaCorta, "") == 0)){
-			*indice = 0;
-		}else{
-			lsInodo(cont, listaInodos, listaNombres);
-			//printf("Valor de rutaCorta antes de buscar: %s\n", rutaCorta);
-			//printf("Valor de dirSuperior antes de buscar: %s\n", dirSuperior);
-			for(int j = 0; j < 10; j++){
-				//printf("Valor de Lista Nombres: %s\n", listaNombres[j]);
-				if((strcmp(dirSuperior, listaNombres[j]) == 0)){
-					//printf("Hemos encontrado %s en la lista de nombres\n", dirSuperior);
-					//Si hemos terminado la ruta y encontramos coincidencia retornamos el nodo
-					if((strcmp(rutaCorta, "") == 0)){
-						*indice = listaInodos[j];
-						break;
-					//No hemos terminado la ruta
-					}else{
-						//printf("La ruta todavia no ha terminado asi que asignamos\n");
-						cont = listaInodos[j];
-						*indicePadre = cont;
-						//printf("El nuevo contador para buscar es: %d\n\n", cont);
-						break;
-					}
-				}else if (j == 9){
-					//Si hay mas ruta es que la ruta no es valida
-					//printf("rutaCorta antes de hacer if maldito: %s\n\n", rutaCorta);
-					//printf("llego\n");
-					//printf("Contenido rutaCorta: %s\n", rutaCorta);
-					//printf("Antes linea maldita\n");
-					if((strcmp(rutaCorta, "") != 0)){
-						//printf("No deberiamos entrar aqui\n\n");
-						invalido = 1;
-					}else{
-						//printf("Paso la linea maldita\n");
-						//Tenemos el indice del padre, pero no encontramos el que queremos crear
-						*indicePadre = cont;
-					}
-				}
-			}
-		}
-	}
-
-	//Retornamos -1 en el indice del padre si la ruta no es valida
-	if(invalido){
+	//Si path esta vacio, no empieza con barra o termina con ella. Ruta invalida
+	if(tamanoPath <= 0 ||
+			path[0] != '/' ||
+			path[strlen(path) - 1] == '/') {
+		//Caso de devolucion igual para rutas invalidas
 		*indicePadre = -1;
+		*indice = -1;
+		strcpy(dirSuperior, "");
+		return ;
 	}
 
-	free(rutaCorta);
+	int inodosDirectorio[10];
+	char nombresDirectorio[10][33];
+	//Comprobamos si existe el fichero para obtener "." y ".."
+	int resul = lsDirAuxiliar(path, 0, inodosDirectorio, nombresDirectorio);
+
+	bzero(dirSuperior, strlen(dirSuperior));
+	strcpy(dirSuperior, path);
+	//dirSuperior contendra el valor de path hasta la ultima / encontrada
+	int i;
+	//Encontrar la ultima barra
+	for(i = tamanoPath - 1; i >= 0; i--)
+		if(path[i] == '/') break;
+	//Borrar de la ultima barra en adelante
+	for(; i < tamanoPath; i++)
+		dirSuperior[i] = '\0';
+
+	// Si esta vacio significa que es el 1er nivel y le ponemos /
+	if (strlen(dirSuperior) == 0)
+		strcpy(dirSuperior, "/");
+
+	if (resul < 0) {
+		// No existe el hijo, pero comprobamos si existe el padre
+		*indice = -1;
+		resul = lsDirAuxiliar(dirSuperior, 0, inodosDirectorio, nombresDirectorio);
+		if (resul < 0){
+			*indicePadre = -1;
+		} else {
+			*indicePadre = inodosDirectorio[0];
+		}	
+	} else {
+		//Existen padre e hijo
+		*indice = inodosDirectorio[0];
+		*indicePadre = inodosDirectorio[1];
+	}
 }
 
 //Crea fichero o directorio por ser procedimientos parecidos
@@ -299,14 +333,15 @@ int crearFichero(char *path, int tipo){
 	//printf("1. infoFichero ha funcionado con valores, %s, %d, %d\n", dirSuperiorAux, inodoPadre, inodo);
 
 	// Pasamos a array para evitarnos hacer free en los muchos errores
+	// al principio contendra la dirSuperior, luego lo transformaremos en el nombre
 	int tamNombre = strlen(dirSuperiorAux);
-	char dirSuperior[tamNombre+1];
-	strcpy(dirSuperior, dirSuperiorAux);
-	dirSuperior[tamNombre]='\0';
+	char nombre[tamNombre+1];
+	strcpy(nombre, dirSuperiorAux);
+	nombre[tamNombre]='\0';
 	free(dirSuperiorAux);
 
-	//printf("Inodo Padre %d\n", inodoPadre);
-	//printf("Inodo Encontrado %d\n", inodo);
+	printf("Inodo Padre %d\n", inodoPadre);
+	printf("Inodo Encontrado %d\n", inodo);
 	if (inodoPadre < 0) {
 		traza("[ERROR] Ruta invalida.\n");
 		return -2;
@@ -341,7 +376,16 @@ int crearFichero(char *path, int tipo){
 	if(esRaiz){
 		strcpy(inodosDisco[inodo].nombre, "/");
 	}else{
-		strcpy(inodosDisco[inodo].nombre, dirSuperior);
+		//Poner nombre del fichero, la direccion es path + strlen(dirSuperior) + 1 por la /
+		char *aPartir = path + strlen(nombre) + 1;
+
+		// Si es el 1er nivel no hay que quitar la /
+		if (inodoPadre == 0) aPartir--;
+
+		bzero(nombre, tamNombre+1);
+		strcpy(nombre, aPartir);
+
+		strcpy(inodosDisco[inodo].nombre, nombre);
 	}
 	//printf("NOMBRE %s\n", inodosDisco[inodo].nombre );
 	inodosDisco[inodo].tamano = 0;
@@ -379,8 +423,7 @@ int crearFichero(char *path, int tipo){
 		}
 		//printf("Buffer: %s\n", bufferLectura);
 		//printf("Tamaño: %d\n", inodosMemoria[inodoPadre].inodo->tamano);
-		//Poner nombre del fichero, la direccion es ruta + strlen(dirSuperior) + 1 por la /
-		sprintf(buff, FORMATO_LINEA_DIRECTORIO, inodo, dirSuperior);
+		sprintf(buff, FORMATO_LINEA_DIRECTORIO, inodo, nombre);
 		memcpy(bufferLectura + inodosMemoria[inodoPadre].inodo->tamano, buff, sizeof(buff));
 		//printf("Buffer: %s\n", bufferLectura);
 		if(bwrite(DEVICE_IMAGE, inodosMemoria[inodoPadre].inodo->bloqueDirecto, bufferLectura) == -1){
@@ -942,63 +985,6 @@ int rmDir(char *path)
 	return ret;
 }
 
-//TO DO: Probar bien la recursividad en listar directorios
-int lsDirAuxiliar(char* path, int indice, int listaInodos[10], char listaNombres[10][33]){
-	//Condicion de parada, no queda mas ruta
-	if((strcmp(path, "") == 0) || (strcmp(path, "/") == 0)){
-		//printf("Criterio de parada alcanzado\n");
-		lsInodo(indice, listaInodos, listaNombres);
-		int i;
-		for(i = 0; i < 10; i++){
-			if(listaInodos[i] == -1){
-				break;
-			}
-			printf("%d %s\n", listaInodos[i], listaNombres[i]);
-		}
-		//Tenemos que quitar "." y ".."
-		return i - 2;
-	}
-	//bzero(listaInodos, sizeof(int) * 10);
-	//bzero(listaNombres, sizeof(char) * 10 * 33);
-	lsInodo(indice, listaInodos, listaNombres);
-	/*
-	for(int i = 0; i < 10; i++){
-		if(listaInodos[i] == -1) break;
-		printf("Inodo contenido en indice %d: %d\n", indice, listaInodos[i]);
-		printf("Nombre contenido en indice %d: %s\n", indice, listaNombres[i]);
-	}
-	*/
-	char *profundidadSuperior = memoria(TAMANO_NOMBRE_FICHERO + 1);
-	char *resul = memoria(strlen(path));
-	trocearRuta(path, resul, profundidadSuperior);
-
-	//printf("Ruta: %s\n", path);
-	//printf("Resultado: %s\n", resul);
-	//printf("Profundidad superior: %s\n", profundidadSuperior);
-	
-	char rutaCorta[strlen(path)];
-	strcpy(rutaCorta, resul);
-	free(resul);
-
-	for(int i = 0; i < 10; i++){
-		if((strcmp(listaNombres[i], profundidadSuperior) == 0) &&
-			(inodosMemoria[listaInodos[i]].inodo->tipo == DIRECTORIO)){
-			//printf("Encontrado directorio en profundidadSuperior\n");
-			//printf("El indice del directorio encontrado es: %d\n", listaInodos[i]);
-			indice = listaInodos[i];
-			break;
-		}else{
-			indice = -1;
-		}
-	}
-	free(profundidadSuperior);
-	if(indice == -1){
-		traza("[ERROR] No se encontro el directorio externo de la ruta\n");
-		return -1;
-	}
-	return lsDirAuxiliar(rutaCorta, indice, listaInodos, listaNombres);
-}
-
 /*
  * @brief	Lists the content of a directory and stores the inodes and names in arrays.
  * @return	The number of items in the directory, -1 if the directory does not exist, -2 in case of error..
@@ -1009,10 +995,13 @@ int lsDir(char *path, int inodesDir[10], char namesDir[10][33])
 		printf("[ERROR] La ruta de lectura no puede estar vacia\n");
 		return -1;
 	}
-	int numeroElementos = 0;
-	int listaInodos[10];
-	char listaNombres[10][33];
-	numeroElementos = lsDirAuxiliar(path, 0, listaInodos, listaNombres);
+	int numeroElementos = lsDirAuxiliar(path, 0, inodesDir, namesDir);
+	for(int i = 0; i < 10; i++){
+		if(inodesDir[i] == -1){
+			break;
+		}
+		printf("%d %s\n", inodesDir[i], namesDir[i]);
+	}
 	return numeroElementos;
 }
 
