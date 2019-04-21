@@ -38,6 +38,7 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
 #define CERRADO 0
 #define ABIERTO 1
 #define FORMATO_LINEA_DIRECTORIO "%u %s\n"
+#define CONTENIDO_MAX_DIRECTORIO 10
 
 struct superBloque{
 	unsigned int numeroMagico;				//Número de superbloque

@@ -102,6 +102,64 @@ int crearArchivo(char *path) {
 	return 0;
 }
 
+int estructuraPrueba(){
+	/*
+/
+	a
+		aa
+			aaa
+			aaf
+		af
+	b
+	f
+*/
+	ret=mkDir("/a");
+	if (ret != 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	ret=mkDir("/a/aa");
+	if (ret != 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	ret=createFile("/a/af");
+	if (ret != 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/af ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/af ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	ret=mkDir("/a/aa/aaa");
+	if (ret != 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaa ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaa ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	ret=createFile("/a/aa/aaf");
+	if (ret != 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaf ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaf ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+
+	ret=mkDir("/b");
+	if (ret != 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /b ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /b ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+
+	ret=createFile("/f");
+	if (ret != 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /f ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /f ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	return 0;
+}
+
 int abrirFichero(char *path) {
 	ret = openFile(path);
 	if (ret != 0){
@@ -147,23 +205,32 @@ int escribirFichero(int fd){
 	return bytesEscritos;
 }
 
+int listarDirectorio(char *path){
+	return 1;
+}
+
 int main()
 {
-	int fd, bytesLeidos, bytesEscritos;
+	//int fd, bytesLeidos, bytesEscritos;
 
-	/*
+	
 	printf("Makeo\n");
 	if (mk()==-1) return -1;
-	*/
+
 	printf("Monto\n");
 	if (montar()==-1) return -1;
+
+	printf("Prueba muchos ficheros\n");
+	if (estructuraPrueba()==-1) return -1;
 	/*
 	printf("Crear directorios /a y /a/b en /\n");
 	if (crearDirectorio()==-1) return -1;
 	*/
+	/*
 	printf("Creando 1 fichero en /f\n");
 	if (crearArchivo("/f")==-1) return -1;
-
+	*/
+	/*
 	printf("Abrir fichero /f1\n");
 	fd = abrirFichero("/f");
 	if (fd==-1) return -1;
@@ -180,7 +247,7 @@ int main()
 
 	printf("Cerrar fichero /f1\n");
 	if (cerrarFichero(fd)==-1) return -1;
-
+	*/
 	printf("Desmonto\n");
 	if (desmontar()==-1) return -1;
 
