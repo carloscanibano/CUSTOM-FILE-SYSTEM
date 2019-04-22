@@ -134,14 +134,20 @@ int sincronizarMemoria() {
 	return 0;
 }
 
-void lsInodo(int in, int listaInodos[10], char listaNombres[10][33])
+// Devuelve 0 si ha ido bien, -1 si cualquier error y -2 si no es directorio
+int lsInodo(int in, int listaInodos[12], char listaNombres[12][33])
 {
+	if (inodosMemoria[in].inodo->tipo != DIRECTORIO) {
+		listaInodos[0]=in;
+		return -2;
+	}
+
 	char *buferLectura = memoria(BLOCK_SIZE);
 	//Leemos del sistema de ficheros el bloque correspondiente
 	if(bread(DEVICE_IMAGE, inodosMemoria[in].inodo->bloqueDirecto, buferLectura) == -1){
 		traza("[ERROR] No se pudo leer el bloque del inodo\n");
 		free(buferLectura);
-		return;
+		return -1;
 	}
 	char *token = strtok(buferLectura, "\n");
 	unsigned char tamInteger=10, tamLinea, i, bandera, cNombre, iResul = 0;
@@ -176,10 +182,11 @@ void lsInodo(int in, int listaInodos[10], char listaNombres[10][33])
 	free(buferLectura);
 
 	//Rellenamos el resto de casillas de las listas con -1 y con "" respectivamente
-	for (i = iResul; i < 10; i++) {
+	for (i = iResul; i < 12; i++) {
 		listaInodos[i] = -1;
 		strcpy(listaNombres[i], "");
 	}
+	return 0;
 }
 
 //Acorta en un nivel la ruta proporcionada y retorna el primer elemento
@@ -206,20 +213,26 @@ void trocearRuta(char *path, char *resul, char *profundidadSuperior)
 	strcpy(profundidadSuperior, ptr);
 }
 
-int lsDirAuxiliar(char* path, int indice, int listaInodos[10], char listaNombres[10][33]){
+int lsDirAuxiliar(char* path, int indice, int listaInodos[12], char listaNombres[12][33]){
+	int flag;
 	//Condicion de parada, no queda mas ruta
 	if((strcmp(path, "") == 0) || (strcmp(path, "/") == 0)){
 		//printf("Criterio de parada alcanzado\n");
-		lsInodo(indice, listaInodos, listaNombres);
+		flag = lsInodo(indice, listaInodos, listaNombres);
+		if(flag < 0) return flag;
+		//printf("Indice de trabajo: %d\n", indice);
 		int i;
-		for(i = 0; i < 10; i++)
+		for(i = 0; i < 12; i++){
+			//printf("Lista de inodos directorio: %d\n", listaInodos[i]);
 			if(listaInodos[i] == -1) break;
+		}
 		//Tenemos que quitar "." y ".."
 		return i - 2;
 	}
 	//bzero(listaInodos, sizeof(int) * 10);
 	//bzero(listaNombres, sizeof(char) * 10 * 33);
-	lsInodo(indice, listaInodos, listaNombres);
+	flag = lsInodo(indice, listaInodos, listaNombres);
+	if(flag < 0) return flag;
 	/*
 	for(int i = 0; i < 10; i++){
 		if(listaInodos[i] == -1) break;
@@ -239,9 +252,8 @@ int lsDirAuxiliar(char* path, int indice, int listaInodos[10], char listaNombres
 	strcpy(rutaCorta, resul);
 	free(resul);
 
-	for(int i = 0; i < 10; i++){
-		if((strcmp(listaNombres[i], profundidadSuperior) == 0) &&
-			(inodosMemoria[listaInodos[i]].inodo->tipo == DIRECTORIO)){
+	for(int i = 0; i < 12; i++){
+		if(strcmp(listaNombres[i], profundidadSuperior) == 0){
 			//printf("Encontrado directorio en profundidadSuperior\n");
 			//printf("El indice del directorio encontrado es: %d\n", listaInodos[i]);
 			indice = listaInodos[i];
@@ -258,10 +270,9 @@ int lsDirAuxiliar(char* path, int indice, int listaInodos[10], char listaNombres
 	return lsDirAuxiliar(rutaCorta, indice, listaInodos, listaNombres);
 }
 
-//Devuelve  si existe la ruta especificada, un 0 en caso contrario
-//En el caso de ruta "/" dirSuperior es "/", indicePadre = 0, indice = 0
-//Casos probados:
-//Básico: /a/b -> dir/fic
+/*Devuelve en dirSuperior el path del padre (si no tiene ""),
+en indicePadre el inodo del padre (-1 si es barra) y
+en indice el inodo (-1 si no existe)*/
 void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 	//El directorio "/" no tiene padre y tratamos el indice de manera especial
 	if(strcmp(path, "/") == 0){
@@ -270,7 +281,6 @@ void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 		strcpy(dirSuperior, "/");
 		return;
 	}
-
 	unsigned int tamanoPath = strlen(path);
 
 	//Si path esta vacio, no empieza con barra o termina con ella. Ruta invalida
@@ -284,8 +294,8 @@ void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 		return ;
 	}
 
-	int inodosDirectorio[10];
-	char nombresDirectorio[10][33];
+	int inodosDirectorio[12];
+	char nombresDirectorio[12][33];
 	//Comprobamos si existe el fichero para obtener "." y ".."
 	int resul = lsDirAuxiliar(path, 0, inodosDirectorio, nombresDirectorio);
 
@@ -304,7 +314,7 @@ void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 	if (strlen(dirSuperior) == 0)
 		strcpy(dirSuperior, "/");
 
-	if (resul < 0) {
+	if (resul == -1) {
 		// No existe el hijo, pero comprobamos si existe el padre
 		*indice = -1;
 		resul = lsDirAuxiliar(dirSuperior, 0, inodosDirectorio, nombresDirectorio);
@@ -312,12 +322,16 @@ void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 			*indicePadre = -1;
 		} else {
 			*indicePadre = inodosDirectorio[0];
-		}	
-	} else {
-		//Existen padre e hijo
+		}
+	} else {// Si es -2 tambien esta el inodo del ~directorio
+		//Existen padre e hijo (el hijo es directorio)
 		*indice = inodosDirectorio[0];
 		*indicePadre = inodosDirectorio[1];
 	}
+	/*printf("INFOFICHERO\n");
+	printf("dirSuperior=%s\n", dirSuperior);
+	printf("indicePadre=%d\n", *indicePadre);
+	printf("indice=%d\n", *indice);*/
 }
 
 //Crea fichero o directorio por ser procedimientos parecidos
@@ -326,7 +340,7 @@ int crearFichero(char *path, int tipo){
 	//Si es 0 el identificador del inodo, es raiz, . y .. son 0
 	//Varibles para encontar inodo y bloque libre.
 	unsigned char esRaiz = (strcmp(path, "/") == 0);
-	char *dirSuperiorAux = memoria(strlen(path));
+	char *dirSuperiorAux = memoria(strlen(path) + 1);
 	int inodoPadre, inodo, b;
 	infoFichero(path, dirSuperiorAux, &inodoPadre, &inodo);
 	//printf("llego\n");
@@ -344,6 +358,7 @@ int crearFichero(char *path, int tipo){
 	printf("Inodo Encontrado %d\n", inodo);
 	if (inodoPadre < 0) {
 		traza("[ERROR] Ruta invalida.\n");
+		//printf("Contenido de path al fallar: %s\n", path);
 		return -2;
 	}
 	if (inodo >= 0) {
@@ -472,7 +487,7 @@ int eliminarFichero(char *path, int tipo) {
 		traza("[ERROR] No se puede borrar el directorio raiz.\n");
 		return -2;
 	}
-	char *dirSuperior=memoria(strlen(path));
+	char *dirSuperior=memoria(strlen(path) + 1);
 	int inodoPadre, inodo;
 	infoFichero(path, dirSuperior, &inodoPadre, &inodo);
 	free(dirSuperior);
@@ -742,7 +757,7 @@ int removeFile(char *path)
  */
 int openFile(char *path)
 {
-	char *dirSuperior=memoria(strlen(path));
+	char *dirSuperior=memoria(strlen(path) + 1);
 	int inodoPadre, inodo;
 	infoFichero(path, dirSuperior, &inodoPadre, &inodo);
 	free(dirSuperior);
@@ -848,27 +863,30 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 	if(numBytes > BLOCK_SIZE - inodo->posicion){
 		numBytes = (BLOCK_SIZE - inodo->posicion);
 	}
-	char * buferLectura = memoria(numBytes);
+	char buferLectura[BLOCK_SIZE];
 
 	//Posicion a partir de la cual tenemos que leer
 	if (inodo->posicion >= BLOCK_SIZE - 1){
-		free(buferLectura);
+		//free(buferLectura);
 		return 0;
 	}
 	//Leemos del sistema de ficheros
 	if(bread(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferLectura) == -1){
-		free(buferLectura);
+		//free(buferLectura);
 		traza("[ERROR] No se puede leer del fichero\n");
 		return -1;
 	}
 
-	memcpy(buffer, buferLectura + inodo->posicion, numBytes);
-	printf("Contenido de buffer: %s\n\n", (char *) buffer);
+	memcpy(buffer, buferLectura + inodo->posicion, numBytes * sizeof(char));
+	printf("Contenido del bloqueDirecto: -%s-\n\n", buferLectura);
+	printf("Contenido de buffer: -%s-\n\n", (char *) buffer);
 	printf("Tamano de buffer: %ld\n\n", strlen((char *) buffer));
-	inodo->posicion += numBytes;
-	free(buferLectura);
+	printf("Bytes: %ld\n\n", numBytes * sizeof(char));
+	printf("Posicion: %d\n\n", inodo->posicion);
+	inodo->posicion += strlen(buffer);
+	//free(buferLectura);
 
-	return strlen((char *) buffer);
+	return (numBytes * sizeof(char));
 }
 
 /*
@@ -905,23 +923,29 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 		return -1;
 	}
 	//bzero(buferEscritura, BLOCK_SIZE);
-	printf("Contenido buferEscritura: %s\n\n", buferEscritura);
+	printf("Contenido buferEscritura: -%s-\n\n", buferEscritura);
 	//Escribimos en el sistema de ficheros
-	memcpy(buferEscritura + inodo->inodo->tamano, buffer, numBytes);
+	memcpy(buferEscritura + inodo->posicion, buffer, numBytes * sizeof(char));
 	//printf("Contenido buferEscritura: %s\n\n", buferEscritura);
 	if(bwrite(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferEscritura) == -1){
 		free(buferEscritura);
 		traza("[ERROR] No se puede escribir en el fichero\n");
 		return -1;
 	}
+	free(buferEscritura);
 
 	char buferLectura[BLOCK_SIZE];
-	bread(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferLectura);
+	if(bread(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferLectura) == -1){
+		traza("[ERROR] No se puede leer el fichero\n");
+		return -1;
+	}
 	printf("Contenido buferLectura despues escribir: -%s-\n\n", buferLectura);
 
 	inodo->inodo->tamano += numBytes;
-	//inodo->posicion += numBytes;
+	inodo->posicion += numBytes;
 
+	printf("inodo->inodo->tamano: %d\n", inodo->inodo->tamano);
+	printf("inodo->posicion: %d\n", inodo->posicion);
 	bloqueModificado(superBloque->primerInodo);
 
 	return numBytes;
@@ -995,12 +1019,15 @@ int lsDir(char *path, int inodesDir[10], char namesDir[10][33])
 		printf("[ERROR] La ruta de lectura no puede estar vacia\n");
 		return -1;
 	}
-	int numeroElementos = lsDirAuxiliar(path, 0, inodesDir, namesDir);
-	for(int i = 0; i < 10; i++){
-		if(inodesDir[i] == -1){
-			break;
-		}
-		printf("%d %s\n", inodesDir[i], namesDir[i]);
+	int inodos[12];
+	char nombres[12][33];
+	int numeroElementos = lsDirAuxiliar(path, 0, inodos, nombres);
+	if (numeroElementos < 0) return numeroElementos;
+	for(int i = 2; i < 12; i++){
+		inodesDir[i-2]=inodos[i];
+		strcpy(namesDir[i-2], nombres[i]);
+		if(inodos[i] != -1)
+			printf("%d %s\n", inodos[i], nombres[i]);
 	}
 	return numeroElementos;
 }
