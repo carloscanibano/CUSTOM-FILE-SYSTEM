@@ -252,40 +252,12 @@ int listarDirectorio(char *path){
 	return numeroElementos;
 }
 
-int main()
-{
-	/*
-	/ (0,4)
-		a (1,5)
-			aa (2,6)
-				aaa (4,8)
-				aaf (5,9)
-			af (3,7)
-		b (6,10)
-		f (7,11)
-	*/
+int testsLseek() {
+	printf("\n\n\n-----------Comienzo testsLseek-----------\n");
+	char *file="/f";
 
-	//int fd, bytesLeidos, bytesEscritos;
-
-	
-	printf("Makeo\n");
-	if (mk()==-1) return -1;
-
-	printf("Monto\n");
-	if (montar()==-1) return -1;
-
-	printf("Crear 39 archivos\n"); if(crearArchivos()==-1) return -1;
-	
-	//printf("Prueba muchos ficheros\n");if (estructuraPrueba()==-1) return -1;
-
-	//printf("Listar directorios\n"); if (listarDirectorio("/a")==-1) return -1;
-
-	printf("Desmonto\n");
-	if (desmontar()==-1) return -1;
-
-	/*
-		int b=11;
-	printf("Relleno el bloque %d con numeros\n", b);
+	int b=11;
+	printf("Relleno el bloque %d con numeros\n\n", b);
 	char buff[BLOCK_SIZE], c = '0', c2 = '9';
 	for(int i = 0; i <= BLOCK_SIZE; ++i) {
 		buff[i]=c;
@@ -297,8 +269,51 @@ int main()
 		printf("[ERROR] al escribir\n");
 		return -1;
 	}
+	bzero(buff, BLOCK_SIZE);
 
+	printf("Abriendo '%s'\n", file);
+	int fd=openFile(file);
+	if (fd < 0) {
+		printf("[ERROR] al abrir\n");
+		return -1;
+	}
+	printf("Abierto con fd=%d\n", fd);
+	printf("\n");
+
+	ret=lseekFile(fd, 2048, FS_SEEK_END);
+	printf("lseekFile=%d\n", ret);
+
+	printf("\n");
+	fd=closeFile(fd);
+	if (fd < 0) {
+		printf("[ERROR] al cerrar\n");
+		return -1;
+	}
+	printf("Cerrado con resul=%d\n", fd);
+
+	printf("-----------Termino testsLseek-----------\n\n\n");
+	return 0;
+}
+
+int testsLeer() {
+	printf("\n\n\n-----------Comienzo testsLeer-----------\n");
 	char *file="/f";
+
+	int b=11;
+	printf("Relleno el bloque %d con numeros\n\n", b);
+	char buff[BLOCK_SIZE], c = '0', c2 = '9';
+	for(int i = 0; i <= BLOCK_SIZE; ++i) {
+		buff[i]=c;
+		c++;
+		if (c==(c2+1))
+			c = '0';
+	}
+	if(bwrite(DEVICE_IMAGE, b, buff) == -1){
+		printf("[ERROR] al escribir\n");
+		return -1;
+	}
+	bzero(buff, BLOCK_SIZE);
+
 	printf("Abriendo '%s'\n", file);
 	int fd=openFile(file);
 	if (fd < 0) {
@@ -307,12 +322,36 @@ int main()
 	}
 	printf("Abierto con fd=%d\n", fd);
 
+	/*int numBytes=readFile(fd, buff, 10);
+	printf("Leo numBytes=%d\n", numBytes);*/
+
 	fd=closeFile(fd);
 	if (fd < 0) {
 		printf("[ERROR] al cerrar\n");
 		return -1;
 	}
-	*/
+	printf("Cerrado con resul=%d\n", fd);
+
+	printf("-----------Termino testsLeer-----------\n\n\n");
+	return 0;
+}
+
+int main()
+{
+
+	//int fd, bytesLeidos, bytesEscritos;
+
+	//printf("Makeo\n");if (mk()==-1) return -1;
+
+	printf("Monto\n");if (montar()==-1) return -1;
+
+	//printf("estructuraPrueba\n");if (estructuraPrueba()==-1) return -1;
+
+	testsLseek();
+
+	//printf("Listar directorios\n"); if (listarDirectorio("/a/aa")==-1) return -1;
+
+	//printf("Desmonto\n");if (desmontar()==-1) return -1;
 
 	return 0;
 }

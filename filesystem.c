@@ -603,15 +603,16 @@ int mkFS(long deviceSize)
 	}
 
 	//Necesitamos formatear el dispositivo para evitar interferencias
-	char bloqueFormateado[BLOCK_SIZE];
+	char * bloqueFormateado = memoria(BLOCK_SIZE);
 	unsigned int cant_bloques=deviceSize/BLOCK_SIZE;
-	bzero(bloqueFormateado, BLOCK_SIZE);
 	for(int i = BLOQUE_PRIMER_DATOS; i < cant_bloques; i++){
 		if(bwrite(DEVICE_IMAGE, i, bloqueFormateado) == -1){
+			free(bloqueFormateado);
 			traza("[ERROR] Error al formatear un bloque\n");
 			return -1;
 		}
 	}
+	free(bloqueFormateado);
 
 	superBloque = memoria(sizeof(struct superBloque));
 	superBloque->numeroMagico = NUM_MAGICO;
@@ -932,30 +933,32 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int lseekFile(int fileDescriptor, long offset, int whence)
 {
-
 	if (fileDescriptor >= MAX_FICHEROS|| fileDescriptor < 0){
 		traza("[ERROR] No se puede modificar el puntero de busqueda. Descriptor de fichero invalido\n");
 		return -1;
 	}
-	if(inodosMemoria[fileDescriptor].estado == CERRADO){
+
+	struct inodoMemoria *iM = &inodosMemoria[estadoFicheros[fileDescriptor]];
+
+	if(iM->estado == CERRADO){
 		traza("[ERROR] No se puede modificar el puntero de busqueda. El archivo esta cerrado\n");
 		return -1;
 	}
 
-	int nuevaPosicion = inodosMemoria[fileDescriptor].posicion + offset;
+	int nuevaPosicion = iM->posicion + offset;
 	switch (whence) {
 		case FS_SEEK_CUR:
-			if (nuevaPosicion < 0 || nuevaPosicion >= inodosMemoria[fileDescriptor].inodo->tamano)
+			if (nuevaPosicion < 0 || nuevaPosicion >= iM->inodo->tamano)
 				return -1;
-			else inodosMemoria[fileDescriptor].posicion = nuevaPosicion;
+			else iM->posicion = nuevaPosicion;
 		break;
 
 		case FS_SEEK_END:
-			inodosMemoria[fileDescriptor].posicion = inodosMemoria[fileDescriptor].inodo->tamano;
+			iM->posicion = iM->inodo->tamano - 1;
 		break;
 
 		case FS_SEEK_BEGIN:
-			inodosMemoria[fileDescriptor].posicion = 0;
+			iM->posicion = 0;
 		break;
 
 		default: return -1;
@@ -1109,17 +1112,19 @@ int bfree(int i)
 		return -1;
 	}
 
-	char buffer[BLOCK_SIZE];
-	bzero(buffer, BLOCK_SIZE);
+	char *buffer = memoria(BLOCK_SIZE);
 	if(bwrite(DEVICE_IMAGE, i, buffer) == -1){
+		free(buffer);
 		traza("[ERROR] No se ha podido liberar el bloque\n");
 		return -1;
 	}
+	free(buffer);
 	struct indices_bits ib=get_indices_bits(i - superBloque->primerBloqueDatos);
 	clear_bit(&mapaBitsBloquesDatos->mapa[ib.a], ib.b);
 	bloqueModificado(BLOQUE_BITS_DATOS);
 	return 0;
 }
+
 
 int namei(char *name)
 {
