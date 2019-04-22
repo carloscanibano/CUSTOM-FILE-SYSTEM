@@ -50,7 +50,9 @@ int sincronizarDisco() {
 	ib=get_indices_bits(BLOQUE_SUPERBLOQUE);
 	if (get_bit(&mapaSync[ib.a], ib.b) == 1) {
 		// SuperBloque
-		//printf("Escribo el SB:\nmagico=%u, numeroBloquesMapaInodos=%u, numeroBloquesMapaDatos=%u, numeroInodos=%u, primerInodo=%u, primerBloqueDatos=%u, numeroBloquesDatos=%u, tamanoDispositivo=%u B\n", superBloque->numeroMagico, superBloque->numeroBloquesMapaInodos, superBloque->numeroBloquesMapaDatos, superBloque->numeroInodos, superBloque->primerInodo, superBloque->primerBloqueDatos, superBloque->numeroBloquesDatos, superBloque->tamanoDispositivo);
+		#ifdef DEBUGB
+			printf("Escribo el SB:\nmagico=%u, numeroBloquesMapaInodos=%u, numeroBloquesMapaDatos=%u, numeroInodos=%u, primerInodo=%u, primerBloqueDatos=%u, numeroBloquesDatos=%u, tamanoDispositivo=%u B\n", superBloque->numeroMagico, superBloque->numeroBloquesMapaInodos, superBloque->numeroBloquesMapaDatos, superBloque->numeroInodos, superBloque->primerInodo, superBloque->primerBloqueDatos, superBloque->numeroBloquesDatos, superBloque->tamanoDispositivo);
+		#endif
 		if(bwrite(DEVICE_IMAGE, BLOQUE_SUPERBLOQUE, (char *) superBloque) == -1){
 			traza("[ERROR] No se puede guardar el mapa de bits de datos\n");
 			return -1;
@@ -81,10 +83,12 @@ int sincronizarDisco() {
 			traza("[ERROR] No se pueden guardar los inodos\n");
 			return -1;
 		}
-		/*printf("Guardando inodos:\n");
-		for (int i=0; i < MAX_FICHEROS; i++) {
-			printf("inodosDisco[%d]: tipo=%u, nombre='%s', tamano=%u, bloqueDirecto=%u\n", i, inodosDisco[i].tipo, inodosDisco[i].nombre, inodosDisco[i].tamano, inodosDisco[i].bloqueDirecto);
-		}*/
+		#ifdef DEBUGB
+			printf("Guardando inodos:\n");
+			for (int i=0; i < MAX_FICHEROS; i++) {
+				printf("inodosDisco[%d]: tipo=%u, nombre='%s', tamano=%u, bloqueDirecto=%u\n", i, inodosDisco[i].tipo, inodosDisco[i].nombre, inodosDisco[i].tamano, inodosDisco[i].bloqueDirecto);
+			}
+		#endif
 	}
 
 	return 0;
@@ -101,7 +105,9 @@ int sincronizarMemoria() {
 			traza("[ERROR] No se pudo leer el superbloque\n");
 			return -1;
 		}
-		//printf("Leo el SB:\nmagico=%u, numeroBloquesMapaInodos=%u, numeroBloquesMapaDatos=%u, numeroInodos=%u, primerInodo=%u, primerBloqueDatos=%u, numeroBloquesDatos=%u, tamanoDispositivo=%u B\n", superBloque->numeroMagico, superBloque->numeroBloquesMapaInodos, superBloque->numeroBloquesMapaDatos, superBloque->numeroInodos, superBloque->primerInodo, superBloque->primerBloqueDatos, superBloque->numeroBloquesDatos, superBloque->tamanoDispositivo);
+		#ifdef DEBUGB
+			printf("Leo el SB:\nmagico=%u, numeroBloquesMapaInodos=%u, numeroBloquesMapaDatos=%u, numeroInodos=%u, primerInodo=%u, primerBloqueDatos=%u, numeroBloquesDatos=%u, tamanoDispositivo=%u B\n", superBloque->numeroMagico, superBloque->numeroBloquesMapaInodos, superBloque->numeroBloquesMapaDatos, superBloque->numeroInodos, superBloque->primerInodo, superBloque->primerBloqueDatos, superBloque->numeroBloquesDatos, superBloque->tamanoDispositivo);
+		#endif
 	}
 
 	if (mapaBitsInodos == NULL || mapaBitsBloquesDatos == NULL) {
@@ -125,10 +131,12 @@ int sincronizarMemoria() {
 			traza("[ERROR] Error al leer los inodos\n");
 			return -1;
 		}
-		/*printf("Recogiendo inodos:\n");
-		for (int i=0; i < MAX_FICHEROS; i++) {
-			printf("inodosDisco[%d]: tipo=%u, nombre='%s', tamano=%u, bloqueDirecto=%u\n", i, inodosDisco[i].tipo, inodosDisco[i].nombre, inodosDisco[i].tamano, inodosDisco[i].bloqueDirecto);
-		}*/
+		#ifdef DEBUGB
+			printf("Recogiendo inodos:\n");
+			for (int i=0; i < MAX_FICHEROS; i++) {
+				printf("inodosDisco[%d]: tipo=%u, nombre='%s', tamano=%u, bloqueDirecto=%u\n", i, inodosDisco[i].tipo, inodosDisco[i].nombre, inodosDisco[i].tamano, inodosDisco[i].bloqueDirecto);
+			}
+		#endif
 	}
 
 	return 0;
@@ -217,36 +225,27 @@ int lsDirAuxiliar(char* path, int indice, int listaInodos[12], char listaNombres
 	int flag;
 	//Condicion de parada, no queda mas ruta
 	if((strcmp(path, "") == 0) || (strcmp(path, "/") == 0)){
-		//printf("Criterio de parada alcanzado\n");
 		flag = lsInodo(indice, listaInodos, listaNombres);
 		if(flag < 0) return flag;
-		//printf("Indice de trabajo: %d\n", indice);
 		int i;
 		for(i = 0; i < 12; i++){
-			//printf("Lista de inodos directorio: %d\n", listaInodos[i]);
 			if(listaInodos[i] == -1) break;
 		}
 		//Tenemos que quitar "." y ".."
 		return i - 2;
 	}
-	//bzero(listaInodos, sizeof(int) * 10);
-	//bzero(listaNombres, sizeof(char) * 10 * 33);
 	flag = lsInodo(indice, listaInodos, listaNombres);
 	if(flag < 0) return flag;
-	/*
-	for(int i = 0; i < 10; i++){
-		if(listaInodos[i] == -1) break;
-		printf("Inodo contenido en indice %d: %d\n", indice, listaInodos[i]);
-		printf("Nombre contenido en indice %d: %s\n", indice, listaNombres[i]);
-	}
-	*/
+	#ifdef DEBUGB
+		for(int i = 0; i < 10; i++){
+			if(listaInodos[i] == -1) break;
+			printf("Inodo contenido en indice %d: %d\n", indice, listaInodos[i]);
+			printf("Nombre contenido en indice %d: %s\n", indice, listaNombres[i]);
+		}
+	#endif
 	char *profundidadSuperior = memoria(TAMANO_NOMBRE_FICHERO + 1);
 	char *resul = memoria(strlen(path));
 	trocearRuta(path, resul, profundidadSuperior);
-
-	//printf("Ruta: %s\n", path);
-	//printf("Resultado: %s\n", resul);
-	//printf("Profundidad superior: %s\n", profundidadSuperior);
 	
 	char rutaCorta[strlen(path)];
 	strcpy(rutaCorta, resul);
@@ -254,8 +253,6 @@ int lsDirAuxiliar(char* path, int indice, int listaInodos[12], char listaNombres
 
 	for(int i = 0; i < 12; i++){
 		if(strcmp(listaNombres[i], profundidadSuperior) == 0){
-			//printf("Encontrado directorio en profundidadSuperior\n");
-			//printf("El indice del directorio encontrado es: %d\n", listaInodos[i]);
 			indice = listaInodos[i];
 			break;
 		}else{
@@ -328,10 +325,12 @@ void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 		*indice = inodosDirectorio[0];
 		*indicePadre = inodosDirectorio[1];
 	}
-	/*printf("INFOFICHERO\n");
-	printf("dirSuperior=%s\n", dirSuperior);
-	printf("indicePadre=%d\n", *indicePadre);
-	printf("indice=%d\n", *indice);*/
+	#ifdef DEBUGB
+		printf("INFOFICHERO\n");
+		printf("dirSuperior=%s\n", dirSuperior);
+		printf("indicePadre=%d\n", *indicePadre);
+		printf("indice=%d\n", *indice);
+	#endif
 }
 
 //Crea fichero o directorio por ser procedimientos parecidos
@@ -343,8 +342,6 @@ int crearFichero(char *path, int tipo){
 	char *dirSuperiorAux = memoria(strlen(path) + 1);
 	int inodoPadre, inodo, b;
 	infoFichero(path, dirSuperiorAux, &inodoPadre, &inodo);
-	//printf("llego\n");
-	//printf("1. infoFichero ha funcionado con valores, %s, %d, %d\n", dirSuperiorAux, inodoPadre, inodo);
 
 	// Pasamos a array para evitarnos hacer free en los muchos errores
 	// al principio contendra la dirSuperior, luego lo transformaremos en el nombre
@@ -354,11 +351,8 @@ int crearFichero(char *path, int tipo){
 	nombre[tamNombre]='\0';
 	free(dirSuperiorAux);
 
-	printf("Inodo Padre %d\n", inodoPadre);
-	printf("Inodo Encontrado %d\n", inodo);
 	if (inodoPadre < 0) {
 		traza("[ERROR] Ruta invalida.\n");
-		//printf("Contenido de path al fallar: %s\n", path);
 		return -2;
 	}
 	if (inodo >= 0) {
@@ -370,15 +364,15 @@ int crearFichero(char *path, int tipo){
 		traza("[ERROR] No se puede crear del fichero, no se puede encontrar un inodo libre.\n");
 		return -2;
 	}
-	//printf("crearFichero Inodo %d\n", inodo);
+
 	b = balloc();
 	if(b == -1){
 		traza("[ERROR] No se puede crear del fichero, no se puede encontrar un bloque libre.\n");
 		return -2;
 	}
-	//printf("crearFichero Bloque %d\n", b);
-
-	//printf("2. inodo y bloque asociados con valor, %d, %d\n", inodo, b);
+	#ifdef DEBUGB
+		printf("Inodo y bloque asociados con valor, %d, %d\n", inodo, b);
+	#endif
 
 	if(esRaiz){
 		if(inodo != 0 || b != superBloque->primerBloqueDatos){
@@ -402,7 +396,7 @@ int crearFichero(char *path, int tipo){
 
 		strcpy(inodosDisco[inodo].nombre, nombre);
 	}
-	//printf("NOMBRE %s\n", inodosDisco[inodo].nombre );
+
 	inodosDisco[inodo].tamano = 0;
 	inodosDisco[inodo].bloqueDirecto = b;
 
@@ -431,25 +425,19 @@ int crearFichero(char *path, int tipo){
 				c++;
 		if (c >= (CONTENIDO_MAX_DIRECTORIO + 2)) {
 			#ifdef DEBUG
-			printf("[ERROR] El padre no puede contener mas de %d ficheros\n", CONTENIDO_MAX_DIRECTORIO);
+				printf("[ERROR] El padre no puede contener mas de %d ficheros\n", CONTENIDO_MAX_DIRECTORIO);
 			#endif
 			free(bufferLectura);
 			return -2;
 		}
-		//printf("Buffer: %s\n", bufferLectura);
-		//printf("Tamaño: %d\n", inodosMemoria[inodoPadre].inodo->tamano);
 		sprintf(buff, FORMATO_LINEA_DIRECTORIO, inodo, nombre);
 		memcpy(bufferLectura + inodosMemoria[inodoPadre].inodo->tamano, buff, sizeof(buff));
-		//printf("Buffer: %s\n", bufferLectura);
 		if(bwrite(DEVICE_IMAGE, inodosMemoria[inodoPadre].inodo->bloqueDirecto, bufferLectura) == -1){
 			traza("[ERROR] Error al formatear un bloque\n");
 			free(bufferLectura);
 			return -1;
 		}
-		//free(bufferLectura);
-
 		inodosMemoria[inodoPadre].inodo->tamano += strlen(buff);
-		//printf("Tamaño: %d\n", inodosMemoria[inodoPadre].inodo->tamano);
 	}
 
 	if(tipo == DIRECTORIO){
@@ -466,7 +454,6 @@ int crearFichero(char *path, int tipo){
 		sprintf(buff, FORMATO_LINEA_DIRECTORIO, inodoPadre, "..");
 		//Anadir ".."
 		memcpy(bufferLectura + tamNombre, buff, sizeof(buff));
-		//printf("Buffer: %s\n", bufferLectura);
 		//Escribimos buff sin desplazamiento por estar el bloque vacio, "."
 		if(bwrite(DEVICE_IMAGE, inodosDisco[inodo].bloqueDirecto, bufferLectura) == -1){
 			traza("[ERROR] Error al formatear un bloque\n");
@@ -475,7 +462,6 @@ int crearFichero(char *path, int tipo){
 		}
 		//Modificamos el tamano del directorio creado ahora mismo
 		inodosDisco[inodo].tamano += strlen(buff) + tamNombre;
-		//if (esRaiz) free(bufferLectura);
 	}
 	free(bufferLectura);
 	return 0;
@@ -506,7 +492,6 @@ int eliminarFichero(char *path, int tipo) {
 		return -3;
 	}
 
-	//printf("--%s--\n", entradasPadre);
 	// Si es directorio y tiene ficheros, entonces no borramos y error
 	if (tipo == DIRECTORIO) {
 		char *entradas = memoria(BLOCK_SIZE);
@@ -682,7 +667,9 @@ int mountFS(void)
 	// Creamos los inodos de memoria
 	inodosMemoria = memoria((sizeof(struct inodoMemoria) * superBloque->numeroInodos));
 	for (int i=0; i < superBloque->numeroInodos; i++) {
-		//printf("inodosDisco[%d]: tipo=%u, nombre='%s', tamano=%u, bloqueDirecto=%u\n", i, inodosDisco[i].tipo, inodosDisco[i].nombre, inodosDisco[i].tamano, inodosDisco[i].bloqueDirecto);
+		#ifdef DEBUGB
+			printf("inodosDisco[%d]: tipo=%u, nombre='%s', tamano=%u, bloqueDirecto=%u\n", i, inodosDisco[i].tipo, inodosDisco[i].nombre, inodosDisco[i].tamano, inodosDisco[i].bloqueDirecto);
+		#endif
 		inodosMemoria[i].inodo=&inodosDisco[i];// Ponemos el puntero
 		inodosMemoria[i].posicion=0;
 		inodosMemoria[i].estado=CERRADO;
@@ -707,15 +694,6 @@ int unmountFS(void)
 {
 	// Guardamos a disco
 	if (sincronizarDisco() == -1) return -1;
-	// Leer bloques para comprobar las entradas de directorio
-	/*
-	char *buff=memoria(BLOCK_SIZE);
-	if(bread(DEVICE_IMAGE, 5, buff) == -1){// Leer el directorio /a
-		traza("[ERROR] No se pueden leer la prueba\n");
-		return -1;
-	}
-	printf("-%s-", buff);
-	*/
 
 	//Eliminar el estado de los ficheros al desmontar el sistema
 	bzero(estadoFicheros, sizeof(unsigned int) * superBloque->numeroInodos);
@@ -761,9 +739,6 @@ int openFile(char *path)
 	int inodoPadre, inodo;
 	infoFichero(path, dirSuperior, &inodoPadre, &inodo);
 	free(dirSuperior);
-
-	//printf("Inodo padre de f1: %d\n", inodoPadre);
-	//printf("Inodo de f1: %d\n", inodo);
 
 	if (inodoPadre < 0) {
 		traza("[ERROR] Ruta invalida.\n");
@@ -815,7 +790,7 @@ int closeFile(int fileDescriptor)
 {
 	if (fileDescriptor < 0 || fileDescriptor >= MAX_FICHEROS){
 		#ifdef DEBUG
-		printf("[ERROR] No se puede cerrar el fichero %d. Descriptor no valido\n", fileDescriptor);
+			printf("[ERROR] No se puede cerrar el fichero %d. Descriptor no valido\n", fileDescriptor);
 		#endif
 		return -1;
 	}
@@ -824,14 +799,14 @@ int closeFile(int fileDescriptor)
 
 	if (inodo == 0){
 		#ifdef DEBUG
-		printf("[ERROR] No se puede cerrar el fichero %d. Descriptor no valido\n", fileDescriptor);
+			printf("[ERROR] No se puede cerrar el fichero %d. Descriptor no valido\n", fileDescriptor);
 		#endif
 		return -1;
 	}
 
 	if(inodosMemoria[inodo].estado == CERRADO){
 		#ifdef DEBUG
-		printf("[ERROR] No se puede cerrar el fichero %d. Ya esta cerrado\n", fileDescriptor);
+			printf("[ERROR] No se puede cerrar el fichero %d. Ya esta cerrado\n", fileDescriptor);
 		#endif
 		return -1;
 	}
@@ -1016,7 +991,7 @@ int rmDir(char *path)
 int lsDir(char *path, int inodesDir[10], char namesDir[10][33])
 {
 	if(strcmp(path, "") == 0){
-		printf("[ERROR] La ruta de lectura no puede estar vacia\n");
+		traza("[ERROR] La ruta de lectura no puede estar vacia\n");
 		return -1;
 	}
 	int inodos[12];
