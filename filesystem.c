@@ -833,36 +833,52 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 		traza("[ERROR] Descriptor de fichero no existente\n");
 		return -1;
 	}
+
 	//Buscamos el inodo para obtener posicion
 	struct inodoMemoria *inodo = &inodosMemoria[estadoFicheros[fileDescriptor]];
-	//Si nos salimos de nuestro bloque, el fin del bloque es nuestra posicion
-	if(numBytes > BLOCK_SIZE - inodo->posicion){
-		numBytes = (BLOCK_SIZE - inodo->posicion);
-	}
-	char buferLectura[BLOCK_SIZE];
 
 	//Posicion a partir de la cual tenemos que leer
-	if (inodo->posicion >= BLOCK_SIZE - 1){
-		//free(buferLectura);
+	if (inodo->posicion >= BLOCK_SIZE){
 		return 0;
 	}
-	//Leemos del sistema de ficheros
+
+	//Si nos salimos de nuestro bloque, leemos hasta el final
+	if(numBytes > (BLOCK_SIZE - inodo->posicion)){
+		numBytes = (BLOCK_SIZE - inodo->posicion);
+	}
+	// Si se lee mas del tamano
+	if(numBytes > inodo->inodo->tamano){
+		numBytes = inodo->inodo->tamano;
+	}
+	#ifdef DEBUGB
+		printf("Bytes a leer: %d\n", numBytes);
+		printf("Posicion: %d\n", inodo->posicion);
+	#endif
+
+	char *buferLectura = memoria(BLOCK_SIZE);
+	//Leemos el bloque entero
 	if(bread(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferLectura) == -1){
-		//free(buferLectura);
+		free(buferLectura);
 		traza("[ERROR] No se puede leer del fichero\n");
 		return -1;
 	}
+	#ifdef DEBUGB
+		printf("Contenido del bloque directo:\n-");
+		for (int i = 0; i < BLOCK_SIZE; ++i)
+			printf("%c", buferLectura[i]);
+		printf("-\n");
+	#endif
 
-	memcpy(buffer, buferLectura + inodo->posicion, numBytes * sizeof(char));
-	printf("Contenido del bloqueDirecto: -%s-\n\n", buferLectura);
-	printf("Contenido de buffer: -%s-\n\n", (char *) buffer);
-	printf("Tamano de buffer: %ld\n\n", strlen((char *) buffer));
-	printf("Bytes: %ld\n\n", numBytes * sizeof(char));
-	printf("Posicion: %d\n\n", inodo->posicion);
-	inodo->posicion += strlen(buffer);
-	//free(buferLectura);
+	// Copiamos el resultado
+	memcpy(buffer, buferLectura + inodo->posicion, numBytes);
+	free(buferLectura);
 
-	return (numBytes * sizeof(char));
+	inodo->posicion += numBytes;
+	#ifdef DEBUGB
+		printf("Posicion final: %d\n", inodo->posicion);
+	#endif
+
+	return numBytes;
 }
 
 /*
@@ -884,25 +900,47 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 
 	//Buscamos el inodo para obtener posicion
 	struct inodoMemoria *inodo = &inodosMemoria[estadoFicheros[fileDescriptor]];
-	//Si nos salimos de nuestro bloque, el fin del bloque es nuestra posicion
-	if(numBytes > BLOCK_SIZE - inodo->posicion){
-		return -1;
-	}
-	if (inodo->posicion >= BLOCK_SIZE - 1){
+
+	//Posicion a partir de la cual tenemos que leer
+	if (inodo->posicion >= BLOCK_SIZE){
 		return 0;
 	}
 
+	//Si nos salimos de nuestro bloque, escribimos hasta el final
+	if(numBytes > BLOCK_SIZE - inodo->posicion){
+		numBytes = (BLOCK_SIZE - inodo->posicion);
+	}
+	#ifdef DEBUGB
+		printf("Bytes a escribir: %d\n", numBytes);
+		printf("Se quiere escribir:\n-");
+		for (int i = 0; i < numBytes; ++i)
+			printf("%c", ((char *)buffer)[i]);
+		printf("-\n");
+		printf("Posicion: %d\n", inodo->posicion);
+	#endif
+
 	char *buferEscritura = memoria(BLOCK_SIZE);
+	// Leemos
 	if(bread(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferEscritura) == -1){
 		free(buferEscritura);
 		traza("[ERROR] No se puede leer el fichero\n");
 		return -1;
 	}
-	//bzero(buferEscritura, BLOCK_SIZE);
-	printf("Contenido buferEscritura: -%s-\n\n", buferEscritura);
+	#ifdef DEBUGB
+		printf("Contenido del bloque directo al leer antes de escribir:\n-");
+		for (int i = 0; i < BLOCK_SIZE; ++i)
+			printf("%c", buferEscritura[i]);
+		printf("-\n");
+	#endif
+
 	//Escribimos en el sistema de ficheros
-	memcpy(buferEscritura + inodo->posicion, buffer, numBytes * sizeof(char));
-	//printf("Contenido buferEscritura: %s\n\n", buferEscritura);
+	memcpy(buferEscritura + inodo->posicion, buffer, numBytes);
+	#ifdef DEBUGB
+		printf("Contenido del bloque modificado antes de escribir:\n-");
+		for (int i = 0; i < BLOCK_SIZE; ++i)
+			printf("%c", buferEscritura[i]);
+		printf("-\n");
+	#endif
 	if(bwrite(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferEscritura) == -1){
 		free(buferEscritura);
 		traza("[ERROR] No se puede escribir en el fichero\n");
@@ -910,19 +948,25 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	}
 	free(buferEscritura);
 
-	char buferLectura[BLOCK_SIZE];
-	if(bread(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferLectura) == -1){
-		traza("[ERROR] No se puede leer el fichero\n");
-		return -1;
-	}
-	printf("Contenido buferLectura despues escribir: -%s-\n\n", buferLectura);
-
-	inodo->inodo->tamano += numBytes;
 	inodo->posicion += numBytes;
-
-	printf("inodo->inodo->tamano: %d\n", inodo->inodo->tamano);
-	printf("inodo->posicion: %d\n", inodo->posicion);
+	inodo->inodo->tamano += numBytes;
 	bloqueModificado(superBloque->primerInodo);
+	#ifdef DEBUGB
+		printf("Posicion final: %d\n", inodo->posicion);
+		printf("Tamano final: %d\n", inodo->inodo->tamano);
+
+		char *buferLectura = memoria(BLOCK_SIZE);
+		if(bread(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferLectura) == -1){
+			free(buferLectura);
+			traza("[ERROR] No se puede leer el fichero\n");
+			return -1;
+		}
+		printf("Contenido del bloque directo despues escribir:\n-");
+		for (int i = 0; i < BLOCK_SIZE; ++i)
+			printf("%c", buferLectura[i]);
+		printf("-\n");
+		free(buferLectura);
+	#endif
 
 	return numBytes;
 }
@@ -950,7 +994,8 @@ int lseekFile(int fileDescriptor, long offset, int whence)
 		case FS_SEEK_CUR:
 			if (nuevaPosicion < 0 || nuevaPosicion >= iM->inodo->tamano)
 				return -1;
-			else iM->posicion = nuevaPosicion;
+			else
+				iM->posicion = nuevaPosicion;
 		break;
 
 		case FS_SEEK_END:
@@ -1124,7 +1169,6 @@ int bfree(int i)
 	bloqueModificado(BLOQUE_BITS_DATOS);
 	return 0;
 }
-
 
 int namei(char *name)
 {

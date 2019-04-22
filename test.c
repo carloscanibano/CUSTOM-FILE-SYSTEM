@@ -295,24 +295,32 @@ int testsLseek() {
 	return 0;
 }
 
+void * mem(size_t size){
+	void *ptr = malloc(size);
+	bzero(ptr, size);
+	return ptr;
+}
+
 int testsLeer() {
 	printf("\n\n\n-----------Comienzo testsLeer-----------\n");
 	char *file="/f";
+	int aux, numBytes;
+	char *buff;
 
-	int b=11;
-	printf("Relleno el bloque %d con numeros\n\n", b);
-	char buff[BLOCK_SIZE], c = '0', c2 = '9';
-	for(int i = 0; i <= BLOCK_SIZE; ++i) {
-		buff[i]=c;
-		c++;
-		if (c==(c2+1))
-			c = '0';
+	aux=11;
+	printf("Relleno el bloque %d con numeros\n\n", aux);
+	buff = mem(BLOCK_SIZE);
+	char c = '0', c2 = '9';
+	for(int i = 0; i < 10; ++i) {
+		buff[i]=c++;
+		if (c > c2) c = '0';
 	}
-	if(bwrite(DEVICE_IMAGE, b, buff) == -1){
+	//printf("Escrita la prueba buff='%s'\n", buff);
+	if(bwrite(DEVICE_IMAGE, aux, buff) == -1){
 		printf("[ERROR] al escribir\n");
 		return -1;
 	}
-	bzero(buff, BLOCK_SIZE);
+	free(buff);
 
 	printf("Abriendo '%s'\n", file);
 	int fd=openFile(file);
@@ -320,38 +328,147 @@ int testsLeer() {
 		printf("[ERROR] al abrir\n");
 		return -1;
 	}
-	printf("Abierto con fd=%d\n", fd);
+	printf("Abierto con fd=%d\n\n", fd);
 
-	/*int numBytes=readFile(fd, buff, 10);
-	printf("Leo numBytes=%d\n", numBytes);*/
+	aux = 2047;
+	buff = mem(aux);
+	numBytes=readFile(fd, buff, aux);
+	printf("Quiero leer numBytes=%d, leo numBytes=%d:\nContenido del buff resul:\n-", aux, numBytes);
+	//printf("'%s'\n", buff);// No se puede hacer porque el ultimo caracter leido no sera un \0
+	for (int i = 0; i < numBytes; ++i)
+		printf("%c", buff[i]);
+	printf("-\n\n\n\n");
+	free(buff);
+
+	aux = 1;
+	buff = mem(aux);
+	numBytes=readFile(fd, buff, aux);
+	printf("Quiero leer numBytes=%d, leo numBytes=%d:\nContenido del buff resul:\n-", aux, numBytes);
+	//printf("'%s'\n", buff);// No se puede hacer porque el ultimo caracter leido no sera un \0
+	for (int i = 0; i < numBytes; ++i)
+		printf("%c", buff[i]);
+	printf("-\n\n\n\n");
+	free(buff);
 
 	fd=closeFile(fd);
 	if (fd < 0) {
 		printf("[ERROR] al cerrar\n");
 		return -1;
 	}
-	printf("Cerrado con resul=%d\n", fd);
+	printf("Fichero cerrado con resul=%d\n", fd);
 
 	printf("-----------Termino testsLeer-----------\n\n\n");
+	return 0;
+}
+
+int testsEscribir() {
+	printf("\n\n\n-----------Comienzo testsEscribir-----------\n");
+	char *file="/f";
+	int aux, numBytes;
+	char *buff;
+
+	buff = mem(BLOCK_SIZE);
+	char c = '0', c2 = '9';
+	for(int i = 0; i < BLOCK_SIZE; ++i) {
+		buff[i]=c++;
+		if (c > c2) c = '0';
+	}
+	/*printf("Relleno el buff para escribir con:\n-");
+	for (int i = 0; i < BLOCK_SIZE; ++i)
+		printf("%c", buffEscribir[i]);
+	printf("-\n");*/
+
+	printf("Abriendo '%s'\n", file);
+	int fd=openFile(file);
+	if (fd < 0) {
+		printf("[ERROR] al abrir\n");
+		return -1;
+	}
+	printf("Abierto con fd=%d\n\n", fd);
+
+	aux = 2000;
+	numBytes=writeFile(fd, buff, aux);
+	printf("Quiero escribir numBytes=%d, escribo numBytes=%d:\n\n\n", aux, numBytes);
+
+	aux = 49;
+	numBytes=writeFile(fd, buff, aux);
+	printf("Quiero escribir numBytes=%d, escribo numBytes=%d:\n\n\n", aux, numBytes);
+
+	/* TO-DO aqui falla, hay que contar bien el tamano de lo que se escribe. Actualmente sumamos el tamaño al escribir,
+	pero si el puntero no esta al final no se deberia sumar*/
+	lseekFile(fd, 0, FS_SEEK_BEGIN);
+	for(int i = 0; i < BLOCK_SIZE; ++i)
+		buff[i]='0';
+	aux = 10;
+	numBytes=writeFile(fd, buff, aux);
+	printf("Quiero escribir numBytes=%d, escribo numBytes=%d:\n\n\n", aux, numBytes);
+
+	free(buff);
+
+	fd=closeFile(fd);
+	if (fd < 0) {
+		printf("[ERROR] al cerrar\n");
+		return -1;
+	}
+	printf("Fichero cerrado con resul=%d\n", fd);
+
+	printf("-----------Termino testsEscribir-----------\n\n\n");
+	return 0;
+}
+
+// Se escribe X/2 A's en el archivo, lseek al principio y leer X, deberia leer solo X/2
+int lecturaConPocoTamano() {
+	char *file="/f";
+	int aux = 100, numBytes;
+	char *buff = mem(aux);
+
+	for(int i = 0; i < aux; ++i)
+		buff[i]='A';
+
+	printf("Abriendo '%s'\n", file);
+	int fd=openFile(file);
+	if (fd < 0) {
+		printf("[ERROR] al abrir\n");
+		return -1;
+	}
+	printf("Abierto con fd=%d\n\n", fd);
+
+	numBytes=writeFile(fd, buff, aux/2);
+	printf("Quiero escribir numBytes=%d, escribo numBytes=%d:\n", aux, numBytes);
+
+	lseekFile(fd, 0, FS_SEEK_BEGIN);
+
+	buff = mem(aux);
+	bzero(buff, aux);
+	numBytes=readFile(fd, buff, aux);
+	printf("Quiero leer numBytes=%d, leo numBytes=%d:\nContenido del buff resul:\n-", aux, numBytes);
+	for (int i = 0; i < numBytes; ++i)
+		printf("%c", buff[i]);
+	printf("-\n\n\n\n");
+	free(buff);
+
+	fd=closeFile(fd);
+	if (fd < 0) {
+		printf("[ERROR] al cerrar\n");
+		return -1;
+	}
+	printf("Fichero cerrado con resul=%d\n", fd);
+
 	return 0;
 }
 
 int main()
 {
 
-	//int fd, bytesLeidos, bytesEscritos;
-
-	//printf("Makeo\n");if (mk()==-1) return -1;
+	printf("Makeo\n");if (mk()==-1) return -1;
 
 	printf("Monto\n");if (montar()==-1) return -1;
 
-	//printf("estructuraPrueba\n");if (estructuraPrueba()==-1) return -1;
+	printf("estructuraPrueba\n");if (estructuraPrueba()==-1) return -1;
 
-	testsLseek();
+	printf("Escribir devuelve %d\n", testsEscribir());
 
-	//printf("Listar directorios\n"); if (listarDirectorio("/a/aa")==-1) return -1;
-
-	//printf("Desmonto\n");if (desmontar()==-1) return -1;
+	printf("Desmonto\n");if (desmontar()==-1) return -1;
 
 	return 0;
 }
