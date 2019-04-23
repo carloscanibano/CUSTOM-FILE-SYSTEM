@@ -246,7 +246,7 @@ int lsDirAuxiliar(char* path, int indice, int listaInodos[12], char listaNombres
 	char *profundidadSuperior = memoria(TAMANO_NOMBRE_FICHERO + 1);
 	char *resul = memoria(strlen(path));
 	trocearRuta(path, resul, profundidadSuperior);
-	
+
 	char rutaCorta[strlen(path)];
 	strcpy(rutaCorta, resul);
 	free(resul);
@@ -585,6 +585,26 @@ int eliminarFichero(char *path, int tipo) {
 	return 0;
 }
 
+int comprobarFichero(long deviceSize) {
+	FILE *fp;
+	if ((fp = fopen(DEVICE_IMAGE, "r")) == NULL){
+		return -1;
+	}
+
+	fseek(fp, 0L, SEEK_END);
+	int sz = ftell(fp);
+
+	if (sz != deviceSize) {
+		fclose(fp);
+		return -2;
+	}
+
+	if (fclose(fp) < 0) {
+		return -2;
+	}
+	return 0;
+}
+
 /*
  * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
  * @return 	0 if success, -1 otherwise.
@@ -596,6 +616,20 @@ int mkFS(long deviceSize)
 		traza("[ERROR] El tamaño del dispositivo no es adecuado\n");
 		return -1;
 	}
+
+	int archivo = comprobarFichero(deviceSize);
+	if (archivo == -1) {
+		traza("[ERROR] El archivo no existe\n");
+		return -1;
+	} else if (archivo == -2) {
+		traza("[ERROR] El archivo no tiene el tamaño del parametro de mkFS\n");
+		return -1;
+	}
+
+	/* TO-DO
+		Comprobar que existe
+		Que el tamano (deviceSize) sea el mismo que el archivo
+	*/
 
 	//Si ya se ha montado el sistema anteriormente, primero desmontamos
 	if(superBloque != NULL){
@@ -824,7 +858,7 @@ int closeFile(int fileDescriptor)
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
 	//Comprobar errores
-	if(numBytes > BLOCK_SIZE || numBytes < 0){
+	if(numBytes < 0){
 		traza("[ERROR] Numero de bytes a leer fuera de limites\n");
 		return -1;
 	}
@@ -888,7 +922,7 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 int writeFile(int fileDescriptor, void *buffer, int numBytes)
 {
 	//Comprobar errores
-	if(numBytes > BLOCK_SIZE || numBytes < 0){
+	if(numBytes < 0){
 		traza("[ERROR] Numero de bytes a escribir fuera de limites\n");
 		return -1;
 	}
@@ -910,7 +944,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	if(numBytes > BLOCK_SIZE - inodo->posicion){
 		numBytes = (BLOCK_SIZE - inodo->posicion);
 	}
-	#ifdef DEBUGB
+	#ifdef DEBUGC
 		printf("Bytes a escribir: %d\n", numBytes);
 		printf("Se quiere escribir:\n-");
 		for (int i = 0; i < numBytes; ++i)
@@ -926,21 +960,21 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 		traza("[ERROR] No se puede leer el fichero\n");
 		return -1;
 	}
-	#ifdef DEBUGB
+	/*#ifdef DEBUGC
 		printf("Contenido del bloque directo al leer antes de escribir:\n-");
 		for (int i = 0; i < BLOCK_SIZE; ++i)
 			printf("%c", buferEscritura[i]);
 		printf("-\n");
-	#endif
+	#endif*/
 
 	//Escribimos en el sistema de ficheros
 	memcpy(buferEscritura + inodo->posicion, buffer, numBytes);
-	#ifdef DEBUGB
+	/*#ifdef DEBUGC
 		printf("Contenido del bloque modificado antes de escribir:\n-");
 		for (int i = 0; i < BLOCK_SIZE; ++i)
 			printf("%c", buferEscritura[i]);
 		printf("-\n");
-	#endif
+	#endif*/
 	if(bwrite(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferEscritura) == -1){
 		free(buferEscritura);
 		traza("[ERROR] No se puede escribir en el fichero\n");
@@ -948,10 +982,18 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	}
 	free(buferEscritura);
 
+	// Si el puntero no esta al final hay que sumar al tamano la diferencia de la posicion y el tamano
+	if (inodo->posicion < inodo->inodo->tamano) {
+		int aux = (inodo->inodo->tamano - inodo->posicion);
+		if (numBytes > aux) {
+			inodo->inodo->tamano += aux;
+		}
+	} else {
+		inodo->inodo->tamano += numBytes;
+	}
 	inodo->posicion += numBytes;
-	inodo->inodo->tamano += numBytes;
 	bloqueModificado(superBloque->primerInodo);
-	#ifdef DEBUGB
+	#ifdef DEBUGC
 		printf("Posicion final: %d\n", inodo->posicion);
 		printf("Tamano final: %d\n", inodo->inodo->tamano);
 
@@ -999,7 +1041,7 @@ int lseekFile(int fileDescriptor, long offset, int whence)
 		break;
 
 		case FS_SEEK_END:
-			iM->posicion = iM->inodo->tamano - 1;
+			iM->posicion = iM->inodo->tamano;
 		break;
 
 		case FS_SEEK_BEGIN:

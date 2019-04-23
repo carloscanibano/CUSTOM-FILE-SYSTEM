@@ -386,6 +386,10 @@ int testsEscribir() {
 	}
 	printf("Abierto con fd=%d\n\n", fd);
 
+	/*aux = 3000;
+	numBytes=writeFile(fd, buff, aux);
+	printf("Quiero escribir numBytes=%d, escribo numBytes=%d:\n\n\n", aux, numBytes);*/
+
 	aux = 2000;
 	numBytes=writeFile(fd, buff, aux);
 	printf("Quiero escribir numBytes=%d, escribo numBytes=%d:\n\n\n", aux, numBytes);
@@ -394,8 +398,6 @@ int testsEscribir() {
 	numBytes=writeFile(fd, buff, aux);
 	printf("Quiero escribir numBytes=%d, escribo numBytes=%d:\n\n\n", aux, numBytes);
 
-	/* TO-DO aqui falla, hay que contar bien el tamano de lo que se escribe. Actualmente sumamos el tamaño al escribir,
-	pero si el puntero no esta al final no se deberia sumar*/
 	lseekFile(fd, 0, FS_SEEK_BEGIN);
 	for(int i = 0; i < BLOCK_SIZE; ++i)
 		buff[i]='0';
