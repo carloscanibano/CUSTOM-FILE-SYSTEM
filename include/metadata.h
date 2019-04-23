@@ -20,6 +20,9 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
 #define PADDING_SB (TAMANO_BLOQUE - 8 * sizeof(unsigned int))
 #define TAMANO_NOMBRE_FICHERO 32
 #define MAX_FICHEROS 40
+#define PROFUNDIDAD_MAXIMA 3
+// Los +1 son por las barras del final
+#define RUTA_MAXIMA ((1 + TAMANO_NOMBRE_FICHERO) * (PROFUNDIDAD_MAXIMA + 1) + 1)
 #define MIN_TAMANO_DISCO 50*1024// 50 KiB
 #define MAX_TAMANO_DISCO 10*1024*1024// 10 MiB
 #define NUM_MAGICO 0xAAFF8023// TO-DO

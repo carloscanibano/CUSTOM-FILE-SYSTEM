@@ -16,12 +16,16 @@ int bmap(int i, int offset);
 void traza(char *str);
 //Asigna memoria dinamica de valor 0
 void * memoria(size_t size);
+//Devuelve -1 si el tamano es nulo o mayor que el limite de diseno
+int comprobarRuta(char *path);
 //Modifica los mapas de bits correspondientes a bloque
 void bloqueModificado(int bloque);
 //Guardar los cambios realizados a disco
 int sincronizarDisco();
 //Actualizar memoria con datos de disco
 int sincronizarMemoria();
+//Comprueba que el fichero existe (si no -1) y su tamano (si no -2)
+int comprobarFichero(long deviceSize);
 //Lista los sucesores de un inodo
 int lsInodo(int in, int listaInodos[10], char listaNombres[10][33]);
 //Formatea la ruta pasada por parametro para quitarle un nivel de profundidad

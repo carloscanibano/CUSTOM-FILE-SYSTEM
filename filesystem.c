@@ -37,6 +37,19 @@ void * memoria(size_t size){
 	return ptr;
 }
 
+int comprobarRuta(char *path) {
+	if (path == NULL) {
+		traza("[ERROR] Parametro path invalido\n");
+		return -1;
+	}
+	int sz = strlen(path);
+	if (sz > RUTA_MAXIMA) {
+		traza("[ERROR] Parametro path invalido\n");
+		return -1;
+	}
+	return 0;
+}
+
 void bloqueModificado(int bloque) {
 	if (mapaSync == NULL) return;
 	struct indices_bits ib = get_indices_bits(bloque);
@@ -335,6 +348,9 @@ void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 
 //Crea fichero o directorio por ser procedimientos parecidos
 int crearFichero(char *path, int tipo){
+	if (comprobarRuta(path) < 0) {
+		return -2;
+	}
 	//Tiene que tener . y .. cada directorio al ser creados...
 	//Si es 0 el identificador del inodo, es raiz, . y .. son 0
 	//Varibles para encontar inodo y bloque libre.
@@ -484,6 +500,9 @@ int crearFichero(char *path, int tipo){
 }
 
 int eliminarFichero(char *path, int tipo) {
+	if (comprobarRuta(path) < 0) {
+		return -2;
+	}
 	// No se puede borrar el /
 	if (strcmp(path, "/") == 0) {
 		traza("[ERROR] No se puede borrar el directorio raiz.\n");
@@ -781,6 +800,9 @@ int removeFile(char *path)
  */
 int openFile(char *path)
 {
+	if (comprobarRuta(path) < 0) {
+		return -2;
+	}
 	char *dirSuperior=memoria(strlen(path) + 1);
 	int inodoPadre, inodo;
 	infoFichero(path, dirSuperior, &inodoPadre, &inodo);
@@ -1091,6 +1113,9 @@ int rmDir(char *path)
  */
 int lsDir(char *path, int inodesDir[10], char namesDir[10][33])
 {
+	if (comprobarRuta(path) < 0) {
+		return -2;
+	}
 	if(strcmp(path, "") == 0){
 		traza("[ERROR] La ruta de lectura no puede estar vacia\n");
 		return -1;
