@@ -228,10 +228,13 @@ void trocearRuta(char *path, char *resul, char *profundidadSuperior)
 	strcpy(copia, path);
 	//Especificamos como separadores el espacio y el \n
 	char *ptr = strtok(copia, "/");
-
-	//Eliminamos un nivel de profundidad de la ruta
-	memcpy(resul, path + strlen(ptr) + 1, strlen(path) - strlen(ptr));
-	strcpy(profundidadSuperior, ptr);
+	if(strlen(ptr) > TAMANO_NOMBRE_FICHERO){
+		strcpy(resul, "MAL");
+	}else{
+		//Eliminamos un nivel de profundidad de la ruta
+		memcpy(resul, path + strlen(ptr) + 1, strlen(path) - strlen(ptr));
+		strcpy(profundidadSuperior, ptr);
+	}
 }
 
 int lsDirAuxiliar(char* path, int indice, int listaInodos[12], char listaNombres[12][33]){
@@ -260,10 +263,10 @@ int lsDirAuxiliar(char* path, int indice, int listaInodos[12], char listaNombres
 	char *resul = memoria(strlen(path));
 	trocearRuta(path, resul, profundidadSuperior);
 
+	if(strcmp(resul, "MAL")== 0) return -2;
 	char rutaCorta[strlen(path)];
 	strcpy(rutaCorta, resul);
 	free(resul);
-
 	for(int i = 0; i < 12; i++){
 		if(strcmp(listaNombres[i], profundidadSuperior) == 0){
 			indice = listaInodos[i];
@@ -277,6 +280,7 @@ int lsDirAuxiliar(char* path, int indice, int listaInodos[12], char listaNombres
 		//traza("[ERROR] No se encontro el directorio externo de la ruta\n");
 		return -1;
 	}
+
 	return lsDirAuxiliar(rutaCorta, indice, listaInodos, listaNombres);
 }
 
@@ -292,7 +296,6 @@ void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 		return;
 	}
 	unsigned int tamanoPath = strlen(path);
-
 	//Si path esta vacio, no empieza con barra o termina con ella. Ruta invalida
 	if(tamanoPath <= 0 ||
 			path[0] != '/' ||
@@ -303,7 +306,6 @@ void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 		strcpy(dirSuperior, "");
 		return ;
 	}
-
 	int inodosDirectorio[12];
 	char nombresDirectorio[12][33];
 	//Comprobamos si existe el fichero para obtener "." y ".."
@@ -324,7 +326,9 @@ void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 	if (strlen(dirSuperior) == 0)
 		strcpy(dirSuperior, "/");
 
-	if (resul == -1) {
+	if (resul == -2){
+		*indicePadre = -1;
+	} else if (resul == -1) {
 		// No existe el hijo, pero comprobamos si existe el padre
 		*indice = -1;
 		resul = lsDirAuxiliar(dirSuperior, 0, inodosDirectorio, nombresDirectorio);
@@ -357,15 +361,14 @@ int crearFichero(char *path, int tipo){
 	unsigned char esRaiz = (strcmp(path, "/") == 0);
 	char *dirSuperiorAux = memoria(strlen(path) + 1);
 	int inodoPadre, inodo, b;
-	infoFichero(path, dirSuperiorAux, &inodoPadre, &inodo);
 
+	infoFichero(path, dirSuperiorAux, &inodoPadre, &inodo);
 	// Pasamos a array para evitarnos hacer free en los muchos errores
 	// al principio contendra la dirSuperior, luego lo transformaremos en el nombre
 	int tamNombre = strlen(dirSuperiorAux);
 	char nombre[tamNombre+1];
 	strcpy(nombre, dirSuperiorAux);
 	nombre[tamNombre]='\0';
-	printf("---%s---%s---", path, dirSuperiorAux);
 	if (tipo == DIRECTORIO) {
 		// Si es directorio comprobamos la profundidad maxima en diseno
 		int profundidad = 0, lim = strlen(path) + 1;
