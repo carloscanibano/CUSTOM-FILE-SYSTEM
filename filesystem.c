@@ -349,6 +349,22 @@ int crearFichero(char *path, int tipo){
 	char nombre[tamNombre+1];
 	strcpy(nombre, dirSuperiorAux);
 	nombre[tamNombre]='\0';
+	printf("---%s---%s---", path, dirSuperiorAux);
+	if (tipo == DIRECTORIO) {
+		// Si es directorio comprobamos la profundidad maxima en diseno
+		int profundidad = 0, lim = strlen(path) + 1;
+		for (int i = 0; i < lim; i++) {
+			if (dirSuperiorAux[i] == '/')
+				profundidad++;
+		}
+		if (profundidad >= PROFUNDIDAD_MAXIMA) {
+			free(dirSuperiorAux);
+			#ifdef DEBUGB
+				printf("[ERROR] La profundidad maxima es %d.\n", PROFUNDIDAD_MAXIMA);
+			#endif
+			return -2;
+		}
+	}
 	free(dirSuperiorAux);
 
 	if (inodoPadre < 0) {
@@ -494,26 +510,26 @@ int eliminarFichero(char *path, int tipo) {
 
 	// Si es directorio y tiene ficheros, entonces no borramos y error
 	if (tipo == DIRECTORIO) {
-		char *entradas = memoria(BLOCK_SIZE);
-		if(bread(DEVICE_IMAGE, inodosMemoria[inodo].inodo->bloqueDirecto, entradas) == -1){
-			free(entradas);
-			traza("[ERROR] al leer un bloque.\n");
+		int inodosDirectorio[12];
+		char nombresDirectorio[12][33];
+		int retLS = lsInodo(inodo, inodosDirectorio, nombresDirectorio);
+		if (retLS == -1 || retLS == -2) {
+			traza("[ERROR] Al borrar recursivamente.\n");
 			return -2;
 		}
-		// Si encontramos mas de 2 (por el . y ..) \n, significa que hay entradas en el directorio
-		int c = 0;
-		for (int i = 0; i < BLOCK_SIZE; i++) {
-			if (entradas[i] == '\n') {
-				c++;
-				// Paramos porque no hace falta leer mas
-				if (c > 2) break;
+		int retRM;
+		for (int i = 2; i < 12; i++) {
+			if (inodosDirectorio[i] < 0) break;
+			char *ruta = memoria(TAMANO_NOMBRE_FICHERO * (PROFUNDIDAD_MAXIMA + 2));
+			strcat(ruta, path);
+			strcat(ruta, "/");
+			strcat(ruta, nombresDirectorio[i]);
+			retRM = eliminarFichero(ruta, inodosMemoria[inodosDirectorio[i]].inodo->tipo);
+			free(ruta);
+			if (retRM) {
+				traza("[ERROR] Al borrar recursivamente.\n");
+				return -2;
 			}
-		}
-		free(entradas);
-
-		if (c > 2) {
-			traza("[ERROR] El directorio a borrar tiene contenido.\n");
-			return -2;
 		}
 	}
 
@@ -625,11 +641,6 @@ int mkFS(long deviceSize)
 		traza("[ERROR] El archivo no tiene el tamaño del parametro de mkFS\n");
 		return -1;
 	}
-
-	/* TO-DO
-		Comprobar que existe
-		Que el tamano (deviceSize) sea el mismo que el archivo
-	*/
 
 	//Si ya se ha montado el sistema anteriormente, primero desmontamos
 	if(superBloque != NULL){

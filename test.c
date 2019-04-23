@@ -130,10 +130,12 @@ int estructuraPrueba(){
 }
 
 int testEliminar() {
-	if (estructuraPrueba()==-1) return -1;
-	printf("Estructura de prueba creada\n\n\n");
-
 	//char *arr;
+
+	/*arr="/a";// Funciona
+	printf("Eliminar %s (recursivo)\n", arr);
+	ret=rmDir(arr);
+	imprimirBloque(5);*/
 
 	/*imprimirBloque(4);
 	arr="/f";
@@ -186,23 +188,21 @@ int testEliminar() {
 	return 0;
 }
 
-int abrirFichero(char *path) {
-	ret = openFile(path);
-	if (ret != 0){
-		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST openFile ", path, ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+int crearProfuncidadCuatro() {
+	ret=createFile("/a/aa/aaa/f");
+	if (ret != 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaa/f ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST openFile ", path, ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	return ret;
-}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaa/f ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 
-int cerrarFichero(int fd) {
-	ret = closeFile(fd);
-	if (ret != 0){
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST closeFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+	ret=mkDir("/a/aa/aaa/aaaa");
+	if (ret != 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaa/aaaa ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST closeFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaa/aaaa ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+imprimirBloque(8);
 	return 0;
 }
 
@@ -468,7 +468,7 @@ int main()
 
 	printf("estructuraPrueba\n");if (estructuraPrueba()==-1) return -1;
 
-	printf("Escribir devuelve %d\n", testsEscribir());
+	printf("crearProfuncidadCuatro devuelve %d\n", crearProfuncidadCuatro());
 
 	printf("Desmonto\n");if (desmontar()==-1) return -1;
 
