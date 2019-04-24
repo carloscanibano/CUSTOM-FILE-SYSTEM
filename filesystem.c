@@ -41,31 +41,36 @@ int comprobarRuta(char *path) {
 		traza("[ERROR] Parametro path invalido\n");
 		return -1;
 	}
+
 	int sz = strlen(path);
-	if (sz > RUTA_MAXIMA) {
+	if (sz > RUTA_MAXIMA || sz == 0 || path[0] != '/') {
 		traza("[ERROR] Parametro path invalido\n");
 		return -1;
 	}
-	if(strcmp(path, "/") != 0){
-		int tamano = 0;
-		char copia[strlen(path)];
-		strcpy(copia, path);
-		char copia1[strlen(path)];
-		strcpy(copia1, path);
-		//Especificamos como separadores el espacio y el \n
-		char *ptr = strtok(copia, "/");
-		tamano = strlen(ptr);
-		while((tamano <= 32) && (strcmp(copia, "") != 0)){
-			memcpy(copia1, copia1 + strlen(ptr) + 1, strlen(copia1) - strlen(ptr));
-			strcpy(copia,copia1);
-			if(strcmp(copia, "") != 0) {
-				ptr = strtok(copia, "/");
-				tamano = strlen(ptr);
+
+	int tamano = 0;
+	char encontrada = 0;
+	for (int i = 0; i < sz; i++) {
+		if (path[i] == '/') {
+			if (encontrada) {// Dos / seguidas
+				traza("[ERROR] Parametro path invalido\n");
+				return -1;
+			}
+			encontrada = 1;
+			tamano = 0;
+		} else {
+			encontrada = 0;
+			tamano++;
+			if (tamano > 32) {
+				traza("[ERROR] Parametro path invalido\n");
+				return -1;
 			}
 		}
-		if (tamano > 32){
-			return -1;
-		}
+	}
+
+	if (sz > 1 && encontrada) {// Termina por /
+		traza("[ERROR] Parametro path invalido\n");
+		return -1;
 	}
 
 	return 0;
