@@ -17,7 +17,6 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
 }
 
 #define TAMANO_BLOQUE 2048
-#define PADDING_SB (TAMANO_BLOQUE - 8 * sizeof(unsigned int))
 #define TAMANO_NOMBRE_FICHERO 32
 #define MAX_FICHEROS 40
 #define PROFUNDIDAD_MAXIMA 3
@@ -28,13 +27,10 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
 #define NUM_MAGICO 0xAAFF8023// TO-DO
 //Numeros de bloque correspondientes al diseno
 #define BLOQUE_SUPERBLOQUE 0
-#define BLOQUE_BITS_INODOS 1
-#define BLOQUE_BITS_INODOS_NUM 1
-#define BLOQUE_BITS_DATOS 2
-#define BLOQUE_BITS_DATOS_NUM 1
-#define BLOQUE_PRIMER_INODO 3
-#define BLOQUE_PRIMER_DATOS 4
-#define TAMANO_INODOS ((int) (ceil((((double)(sizeof(struct inodo) * MAX_FICHEROS))) / BLOCK_SIZE)))
+#define BLOQUE_MAPAS_BITS 1
+#define BLOQUE_MAPAS_BITS_NUM 1
+#define BLOQUE_PRIMER_INODO 2
+#define BLOQUE_PRIMER_DATOS 3
 //Referente a los estados de inodos y tipos
 #define FICHERO 0
 #define DIRECTORIO 1
@@ -43,10 +39,10 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
 #define FORMATO_LINEA_DIRECTORIO "%u %s\n"
 #define CONTENIDO_MAX_DIRECTORIO 10
 
+#define PADDING_SB (TAMANO_BLOQUE - 7 * sizeof(unsigned int))
 struct superBloque{
 	unsigned int numeroMagico;				//Número de superbloque
-	unsigned int numeroBloquesMapaInodos;	//Número de bloques del mapa de inodos
-	unsigned int numeroBloquesMapaDatos;	//Número de bloques del mapa de datos
+	unsigned int numeroBloqueMapasBits;		//Número de bloques del mapa de inodos
 	unsigned int numeroInodos;				//Número de inodos totales
 	unsigned int primerInodo;				//Número del primer inodo en el sistema
 	unsigned int numeroBloquesDatos;		//Número de bloques de datos
@@ -74,12 +70,11 @@ struct inodoMemoria{
 #include <limits.h> // para CHAR_BIT (cantidad de bits en un char/byte)
 
 typedef unsigned char bits;
-#define NUM_BITS (sizeof(bits) * CHAR_BIT)
-#define NUM_PALABRAS (MAX_FICHEROS/sizeof(bits))
+#define NUM_PALABRAS MAX_FICHEROS/CHAR_BIT
 
 // Macros y funciones para el manejo
-#define WORD_OFFSET(b) ((b) / NUM_BITS)
-#define BIT_OFFSET(b)  ((b) % NUM_BITS)
+#define WORD_OFFSET(b) ((b) / CHAR_BIT)
+#define BIT_OFFSET(b)  ((b) % CHAR_BIT)
 void set_bit(bits *words, int n);// Pone el bit n a 1
 void clear_bit(bits *words, int n);// Pone el bit n a 0
 int get_bit(bits *words, int n);// Devuelve el bit n
@@ -96,15 +91,11 @@ struct indices_bits{
 
 // Usaremos el PALABRAS_SYNC para crear el mapa de bits del metodo sincronizarDisco
 #define PALABRAS_SYNC ((unsigned int)(ceil((double)BLOQUE_PRIMER_DATOS/(double)CHAR_BIT)))
-#define PADDING_MAPA (TAMANO_BLOQUE - (sizeof(bits) * NUM_PALABRAS))
+#define PADDING_MAPA (BLOCK_SIZE - (NUM_PALABRAS * 2))
 
-struct mapaBitsInodos{
-	bits mapa[NUM_PALABRAS];
-	//Relleno para mapa de bits
-	char relleno[PADDING_MAPA];
-};
-struct mapaBitsBloquesDatos{
-	bits mapa[NUM_PALABRAS];
+struct mapasBits{
+	bits inodos[NUM_PALABRAS];
+	bits bloques[NUM_PALABRAS];
 	//Relleno para mapa de bits
 	char relleno[PADDING_MAPA];
 };

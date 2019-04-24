@@ -16,14 +16,13 @@
 #include "include/metadata.h"   // Type and structure declaration of the file system
 
 struct superBloque *superBloque = NULL;
-struct mapaBitsInodos *mapaBitsInodos = NULL;
-struct mapaBitsBloquesDatos *mapaBitsBloquesDatos = NULL;
+struct mapasBits *mapas = NULL;
 struct inodo *inodosDisco = NULL;
 struct inodoMemoria *inodosMemoria = NULL;
 // El indice es el descriptor y inodo es el valor guardado
 unsigned int estadoFicheros[MAX_FICHEROS];
 // Para saber si es necesario guardar en disco tenemos un mapa de bits, 1 significa que esta desactualizado
-unsigned char *mapaSync = NULL;
+bits *mapaSync = NULL;
 
 void traza(char *str){
 	#ifdef DEBUG
@@ -49,26 +48,25 @@ int comprobarRuta(char *path) {
 	}
 	if(strcmp(path, "/") != 0){
 		int tamano = 0;
-	  char copia[strlen(path)];
-	  strcpy(copia, path);
-	  char copia1[strlen(path)];
-	  strcpy(copia1, path);
+		char copia[strlen(path)];
+		strcpy(copia, path);
+		char copia1[strlen(path)];
+		strcpy(copia1, path);
 		//Especificamos como separadores el espacio y el \n
 		char *ptr = strtok(copia, "/");
 		tamano = strlen(ptr);
-	  while((tamano <= 32) && (strcmp(copia, "") != 0)){
-	    memcpy(copia1, copia1 + strlen(ptr) + 1, strlen(copia1) - strlen(ptr));
-	    strcpy(copia,copia1);
-	    if(strcmp(copia, "") != 0) {
+		while((tamano <= 32) && (strcmp(copia, "") != 0)){
+			memcpy(copia1, copia1 + strlen(ptr) + 1, strlen(copia1) - strlen(ptr));
+			strcpy(copia,copia1);
+			if(strcmp(copia, "") != 0) {
 				ptr = strtok(copia, "/");
 				tamano = strlen(ptr);
 			}
 		}
 		if (tamano > 32){
-	    return -1;
+			return -1;
 		}
 	}
-
 
 	return 0;
 }
@@ -87,7 +85,7 @@ int sincronizarDisco() {
 	if (get_bit(&mapaSync[ib.a], ib.b) == 1) {
 		// SuperBloque
 		#ifdef DEBUGB
-			printf("Escribo el SB:\nmagico=%u, numeroBloquesMapaInodos=%u, numeroBloquesMapaDatos=%u, numeroInodos=%u, primerInodo=%u, primerBloqueDatos=%u, numeroBloquesDatos=%u, tamanoDispositivo=%u B\n", superBloque->numeroMagico, superBloque->numeroBloquesMapaInodos, superBloque->numeroBloquesMapaDatos, superBloque->numeroInodos, superBloque->primerInodo, superBloque->primerBloqueDatos, superBloque->numeroBloquesDatos, superBloque->tamanoDispositivo);
+			printf("Escribo el SB:\nmagico=%u, numeroBloqueMapasBits=%u, numeroInodos=%u, primerInodo=%u, primerBloqueDatos=%u, numeroBloquesDatos=%u, tamanoDispositivo=%u B\n", superBloque->numeroMagico, superBloque->numeroBloqueMapasBits, superBloque->numeroInodos, superBloque->primerInodo, superBloque->primerBloqueDatos, superBloque->numeroBloquesDatos, superBloque->tamanoDispositivo);
 		#endif
 		if(bwrite(DEVICE_IMAGE, BLOQUE_SUPERBLOQUE, (char *) superBloque) == -1){
 			traza("[ERROR] No se puede guardar el mapa de bits de datos\n");
@@ -95,36 +93,32 @@ int sincronizarDisco() {
 		}
 		clear_bit(&mapaSync[ib.a], ib.b);
 	}
-	ib=get_indices_bits(BLOQUE_BITS_INODOS);
+	ib=get_indices_bits(BLOQUE_MAPAS_BITS);
 	if (get_bit(&mapaSync[ib.a], ib.b) == 1) {
+		#ifdef DEBUGB
+			printf("Guardo los mapas de bits.\n");
+		#endif
 		// Mapa de bits de inodos
-		if(bwrite(DEVICE_IMAGE, BLOQUE_BITS_INODOS, (char *) mapaBitsInodos->mapa) == -1){
-			traza("[ERROR] No se puede guardar el mapa de bits de inodos\n");
+		if(bwrite(DEVICE_IMAGE, BLOQUE_MAPAS_BITS, (char *) mapas) == -1){
+			traza("[ERROR] No se pueden guardar los mapas de bits\n");
 			return -1;
 		}
 		clear_bit(&mapaSync[ib.a], ib.b);
 	}
-	ib=get_indices_bits(BLOQUE_BITS_DATOS);
-	if (get_bit(&mapaSync[ib.a], ib.b) == 1) {
-		// Mapa de bits de bloques de datos
-		if(bwrite(DEVICE_IMAGE, BLOQUE_BITS_DATOS, (char *) mapaBitsBloquesDatos->mapa) == -1){
-			traza("[ERROR] No se puede guardar el mapa de bits de datos\n");
-			return -1;
-		}
-	}
 	ib=get_indices_bits(BLOQUE_PRIMER_INODO);
 	if (get_bit(&mapaSync[ib.a], ib.b) == 1) {
+		#ifdef DEBUGB
+			printf("Guardando inodos:\n");
+			for (int i=0; i < MAX_FICHEROS; i++) {
+				printf("\tinodosDisco[%d]: tipo=%u, nombre='%s', tamano=%u, bloqueDirecto=%u\n", i, inodosDisco[i].tipo, inodosDisco[i].nombre, inodosDisco[i].tamano, inodosDisco[i].bloqueDirecto);
+			}
+		#endif
 		//Guardamos los inodos
 		if(bwrite(DEVICE_IMAGE, BLOQUE_PRIMER_INODO, (char *) inodosDisco) == -1){
 			traza("[ERROR] No se pueden guardar los inodos\n");
 			return -1;
 		}
-		#ifdef DEBUGB
-			printf("Guardando inodos:\n");
-			for (int i=0; i < MAX_FICHEROS; i++) {
-				printf("inodosDisco[%d]: tipo=%u, nombre='%s', tamano=%u, bloqueDirecto=%u\n", i, inodosDisco[i].tipo, inodosDisco[i].nombre, inodosDisco[i].tamano, inodosDisco[i].bloqueDirecto);
-			}
-		#endif
+		clear_bit(&mapaSync[ib.a], ib.b);
 	}
 
 	return 0;
@@ -142,20 +136,18 @@ int sincronizarMemoria() {
 			return -1;
 		}
 		#ifdef DEBUGB
-			printf("Leo el SB:\nmagico=%u, numeroBloquesMapaInodos=%u, numeroBloquesMapaDatos=%u, numeroInodos=%u, primerInodo=%u, primerBloqueDatos=%u, numeroBloquesDatos=%u, tamanoDispositivo=%u B\n", superBloque->numeroMagico, superBloque->numeroBloquesMapaInodos, superBloque->numeroBloquesMapaDatos, superBloque->numeroInodos, superBloque->primerInodo, superBloque->primerBloqueDatos, superBloque->numeroBloquesDatos, superBloque->tamanoDispositivo);
+			printf("Leo el SB:\nmagico=%u, numeroBloqueMapasBits=%u, numeroInodos=%u, primerInodo=%u, primerBloqueDatos=%u, numeroBloquesDatos=%u, tamanoDispositivo=%u B\n", superBloque->numeroMagico, superBloque->numeroBloqueMapasBits, superBloque->numeroInodos, superBloque->primerInodo, superBloque->primerBloqueDatos, superBloque->numeroBloquesDatos, superBloque->tamanoDispositivo);
 		#endif
 	}
 
-	if (mapaBitsInodos == NULL || mapaBitsBloquesDatos == NULL) {
-		mapaBitsInodos = memoria(TAMANO_BLOQUE);
-		mapaBitsBloquesDatos = memoria(TAMANO_BLOQUE);
+	if (mapas == NULL) {
+		#ifdef DEBUGB
+			printf("Leo los mapas de bits.\n");
+		#endif
+		mapas = memoria(TAMANO_BLOQUE);
 		//Leer mapas de bits
-		if(bread(DEVICE_IMAGE, BLOQUE_BITS_INODOS, (char *) mapaBitsInodos) == -1){
-			traza("[ERROR] No se pueden leer los mapas de bits de inodos\n");
-			return -1;
-		}
-		if(bread(DEVICE_IMAGE, BLOQUE_BITS_DATOS, (char *) mapaBitsBloquesDatos) == -1){
-			traza("[ERROR] No se pueden leer los mapas de bits de inodos\n");
+		if(bread(DEVICE_IMAGE, BLOQUE_MAPAS_BITS, (char *) mapas) == -1){
+			traza("[ERROR] No se pueden leer los mapas de bits\n");
 			return -1;
 		}
 	}
@@ -168,9 +160,9 @@ int sincronizarMemoria() {
 			return -1;
 		}
 		#ifdef DEBUGB
-			printf("Recogiendo inodos:\n");
+			printf("Leo los inodos:\n");
 			for (int i=0; i < MAX_FICHEROS; i++) {
-				printf("inodosDisco[%d]: tipo=%u, nombre='%s', tamano=%u, bloqueDirecto=%u\n", i, inodosDisco[i].tipo, inodosDisco[i].nombre, inodosDisco[i].tamano, inodosDisco[i].bloqueDirecto);
+				printf("\tinodosDisco[%d]: tipo=%u, nombre='%s', tamano=%u, bloqueDirecto=%u\n", i, inodosDisco[i].tipo, inodosDisco[i].nombre, inodosDisco[i].tamano, inodosDisco[i].bloqueDirecto);
 			}
 		#endif
 	}
@@ -703,8 +695,7 @@ int mkFS(long deviceSize)
 
 	superBloque = memoria(sizeof(struct superBloque));
 	superBloque->numeroMagico = NUM_MAGICO;
-	superBloque->numeroBloquesMapaInodos = BLOQUE_BITS_INODOS_NUM;
-	superBloque->numeroBloquesMapaDatos = BLOQUE_BITS_DATOS_NUM;
+	superBloque->numeroBloqueMapasBits = BLOQUE_MAPAS_BITS;
 	superBloque->numeroInodos = MAX_FICHEROS;
 	superBloque->primerInodo = BLOQUE_PRIMER_INODO;
 	superBloque->primerBloqueDatos = BLOQUE_PRIMER_DATOS;
@@ -713,9 +704,8 @@ int mkFS(long deviceSize)
 	bzero(superBloque->relleno, PADDING_SB);
 
 	//Creacion de las estructuras estáticas de disco
-	mapaBitsInodos = memoria(sizeof(struct mapaBitsInodos));
-	mapaBitsBloquesDatos = memoria(sizeof(struct mapaBitsBloquesDatos));
-	//printf("-%d-\n", (int)NUM_PALABRAS);
+	mapas = memoria(sizeof(struct mapasBits));
+
 	// sizeof(struct inodo) * MAX_FICHEROS cabe en un bloque
 	inodosDisco = memoria(BLOCK_SIZE);
 	for (int i=0; i < MAX_FICHEROS; i++) {
@@ -730,12 +720,10 @@ int mkFS(long deviceSize)
 		return -1;
 	}
 
-	int bytes = ((unsigned int) sizeof(bits))*PALABRAS_SYNC;
-	mapaSync = memoria(bytes);
+	mapaSync = memoria(PALABRAS_SYNC);
 
 	bloqueModificado(BLOQUE_SUPERBLOQUE);
-	bloqueModificado(BLOQUE_BITS_INODOS);
-	bloqueModificado(BLOQUE_BITS_DATOS);
+	bloqueModificado(BLOQUE_MAPAS_BITS);
 	bloqueModificado(BLOQUE_PRIMER_INODO);
 
 	// Guardamos a disco
@@ -754,9 +742,12 @@ int mountFS(void)
 
 	// Creamos los inodos de memoria
 	inodosMemoria = memoria((sizeof(struct inodoMemoria) * superBloque->numeroInodos));
+	#ifdef DEBUGB
+		printf("Creo los inodos de memoria\n");
+	#endif
 	for (int i=0; i < superBloque->numeroInodos; i++) {
 		#ifdef DEBUGB
-			printf("inodosDisco[%d]: tipo=%u, nombre='%s', tamano=%u, bloqueDirecto=%u\n", i, inodosDisco[i].tipo, inodosDisco[i].nombre, inodosDisco[i].tamano, inodosDisco[i].bloqueDirecto);
+			printf("\tinodosDisco[%d]: tipo=%u, nombre='%s', tamano=%u, bloqueDirecto=%u\n", i, inodosDisco[i].tipo, inodosDisco[i].nombre, inodosDisco[i].tamano, inodosDisco[i].bloqueDirecto);
 		#endif
 		inodosMemoria[i].inodo=&inodosDisco[i];// Ponemos el puntero
 		inodosMemoria[i].posicion=0;
@@ -764,9 +755,8 @@ int mountFS(void)
 	}
 
 	// Bytes necesarios para el mapa, pueden sobrar, pero siempre menos de CHAR_BIT
-	int bytes = ((unsigned int) sizeof(bits))*PALABRAS_SYNC;
 	if (mapaSync == NULL)
-		mapaSync = memoria(bytes);
+		mapaSync = memoria(PALABRAS_SYNC);
 
 	// Preparamos el estado de los ficheros
 	bzero(estadoFicheros, sizeof(unsigned int) * superBloque->numeroInodos);
@@ -788,8 +778,7 @@ int unmountFS(void)
 
 	//Liberamos recursos
 	free(superBloque);
-	free(mapaBitsInodos);
-	free(mapaBitsBloquesDatos);
+	free(mapas);
 	free(inodosDisco);
 	free(inodosMemoria);
 	free(mapaSync);
@@ -1016,21 +1005,21 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 		traza("[ERROR] No se puede leer el fichero\n");
 		return -1;
 	}
-	/*#ifdef DEBUGC
+	#ifdef DEBUGC
 		printf("Contenido del bloque directo al leer antes de escribir:\n-");
 		for (int i = 0; i < BLOCK_SIZE; ++i)
 			printf("%c", buferEscritura[i]);
 		printf("-\n");
-	#endif*/
+	#endif
 
 	//Escribimos en el sistema de ficheros
 	memcpy(buferEscritura + inodo->posicion, buffer, numBytes);
-	/*#ifdef DEBUGC
+	#ifdef DEBUGC
 		printf("Contenido del bloque modificado antes de escribir:\n-");
 		for (int i = 0; i < BLOCK_SIZE; ++i)
 			printf("%c", buferEscritura[i]);
 		printf("-\n");
-	#endif*/
+	#endif
 	if(bwrite(DEVICE_IMAGE, inodo->inodo->bloqueDirecto, buferEscritura) == -1){
 		free(buferEscritura);
 		traza("[ERROR] No se puede escribir en el fichero\n");
@@ -1190,8 +1179,7 @@ int get_num_indices(struct indices_bits ib) {
 	return ib.a*CHAR_BIT+ib.b;
 }
 
-int ialloc()
-{
+int ialloc() {
 	int i, a, b;
 	//Recorrer inodos hasta encontrar uno vacio
 	for (i=0; i < superBloque->numeroInodos; i++) {
@@ -1199,38 +1187,36 @@ int ialloc()
 		b=i%CHAR_BIT;
 
 		//Si el valor es 0, hemos encontrado uno vacio
-		if (get_bit(&mapaBitsInodos->mapa[a], b) == 0) {
+		if (get_bit(&mapas->inodos[a], b) == 0) {
 			//Para indicar que esta en uso le asignamos valor
-			set_bit(&mapaBitsInodos->mapa[a], b);
+			set_bit(&mapas->inodos[a], b);
 			//Sincronizamos con los mapas de bits
-			bloqueModificado(BLOQUE_BITS_INODOS);
+			bloqueModificado(BLOQUE_MAPAS_BITS);
 			return i;
 		}
 	}
 
 	//No se ha encontrado un inodo libre
-	traza("[ERROR] No se ha encontrado un inodo libre\n");
+	traza("[ERROR] No se ha encontrado un inodo libre, todos ocupados\n");
 	return -1;
 }
 
-int ifree(int i)
-{
+int ifree(int i) {
 	if(i > superBloque->numeroInodos || i < 0){
 		traza("[ERROR] Indice de inodo erroneo\n");
 		return -1;
 	}
 
 	struct indices_bits ib=get_indices_bits(i);
-	clear_bit(&mapaBitsInodos->mapa[ib.a], ib.b);
+	clear_bit(&mapas->bloques[ib.a], ib.b);
 	//Sincronizamos los mapas de bits
-	bloqueModificado(BLOQUE_BITS_INODOS);
+	bloqueModificado(BLOQUE_MAPAS_BITS);
 
 	return 0;
 }
 
 // Busca un bloque libre, -1 si no hay libres
-int balloc()
-{
+int balloc() {
 	int i, a, b;
 	//Recorrer el mapa de los bloques hasta encontrar uno libre
 	for (i=0; i < superBloque->numeroBloquesDatos; i++) {
@@ -1238,25 +1224,25 @@ int balloc()
 		b=i%CHAR_BIT;
 
 		//Si el valor es 0, hemos encontrado uno vacio
-		if (get_bit(&mapaBitsBloquesDatos->mapa[a], b) == 0) {
-			//Para indicar que esta en uso le asignamos valor
-			set_bit(&mapaBitsBloquesDatos->mapa[a], b);
-			bloqueModificado(BLOQUE_BITS_DATOS);
-			if(i > superBloque->primerBloqueDatos){
+		if (get_bit(&mapas->bloques[a], b) == 0) {
+			// No hay mas bloques
+			if (i > superBloque->numeroBloquesDatos) {
 				traza("[ERROR] No se ha encontrado un bloque libre, disco lleno\n");
 				return -1;
 			}
+			//Para indicar que esta en uso le asignamos valor
+			set_bit(&mapas->bloques[a], b);
+			bloqueModificado(BLOQUE_MAPAS_BITS);
 			return i + superBloque->primerBloqueDatos;
 		}
 	}
 	// No se ha enciontrado uno libre
-	traza("[ERROR] No se ha encontrado un bloque libre\n");
+	traza("[ERROR] No se ha encontrado un bloque libre, todos ocupados\n");
 	return -1;
 }
 
 // Libera un bloque
-int bfree(int i)
-{
+int bfree(int i) {
 	if(i < 0 || i > superBloque->numeroBloquesDatos){
 		traza("[ERROR] Indice de bloque erroneo\n");
 		return -1;
@@ -1270,37 +1256,7 @@ int bfree(int i)
 	}
 	free(buffer);
 	struct indices_bits ib=get_indices_bits(i - superBloque->primerBloqueDatos);
-	clear_bit(&mapaBitsBloquesDatos->mapa[ib.a], ib.b);
-	bloqueModificado(BLOQUE_BITS_DATOS);
+	clear_bit(&mapas->bloques[ib.a], ib.b);
+	bloqueModificado(BLOQUE_MAPAS_BITS);
 	return 0;
-}
-
-int namei(char *name)
-{
-	int i;
-	// buscar i-nodo con nombre <name>
-	for (i = 0; i < superBloque->numeroInodos; i++){
-		if(!strcmp(inodosMemoria[i].inodo->nombre, name)){
-			return i;
-		}
-	}
-	//Si no lo encuentra retorna -1
-	traza("[ERROR] Inodo no encontrado \n");
-	return -1;
-}
-
-int bmap(int inodo_id, int offset)
-{
-	//Comprobamos que el id el inodo sea válido y el offset también
-	if( (inodo_id > superBloque->numeroInodos) || (inodo_id<0) || (offset < 0) ){
-		traza("[ERROR] Id del nodo no es válido. No se puede localizar el bloque de datos \n");
-		return -1;
-	}
-
-	//Retorna el bloque de inodo
-	if(offset < BLOCK_SIZE){
-		return inodosMemoria[inodo_id].inodo->bloqueDirecto;
-	}
-
-	return -1;
 }

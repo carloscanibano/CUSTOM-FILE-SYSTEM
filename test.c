@@ -73,6 +73,7 @@ int crearArchivos() {
 
 int estructuraPrueba(){
 /*
+Ojo que al tener el mapa de bit en el mismo bloque, el bloque es 1 menos
 / (0,4)
 	a (1,5)
 		aa (2,6)
@@ -459,6 +460,32 @@ int lecturaConPocoTamano() {
 	return 0;
 }
 
+// Crea 6 directorios y cada uno tiene 10 archivos
+int crearMuchosArchivos() {
+	char buffer[128], dir[64];
+	for(int i = 0; i < 6; i++){
+		sprintf(dir, "%s%d", "/dir", i);
+		ret = mkDir(dir);
+		if (ret != 0){
+			fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkDir ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+			return -1;
+		}
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkDir ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+		for(int j = 0; j < 10; j++){
+			sprintf(buffer, "%s%s%d", dir, "/f", j);
+			printf("Creo el archivo %s\n", buffer);
+			ret = createFile(buffer);
+			if (ret != 0){
+				fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+				return -1;
+			}
+			fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+		}
+	}
+	return 0;
+
+}
+
 int main()
 {
 
@@ -466,9 +493,9 @@ int main()
 
 	printf("Monto\n");if (montar()==-1) return -1;
 
-	printf("estructuraPrueba\n");if (estructuraPrueba()==-1) return -1;
+	//printf("estructuraPrueba\n");if (estructuraPrueba()==-1) return -1;
 
-	printf("crearProfuncidadCuatro devuelve %d\n", crearProfuncidadCuatro());
+	printf("crearMuchosArchivos devuelve %d (debe ser -1 porque intenta crear 60 cosas)\n", crearMuchosArchivos());
 
 	printf("Desmonto\n");if (desmontar()==-1) return -1;
 
