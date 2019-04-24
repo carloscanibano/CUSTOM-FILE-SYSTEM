@@ -47,6 +47,35 @@ int comprobarRuta(char *path) {
 		traza("[ERROR] Parametro path invalido\n");
 		return -1;
 	}
+	if(strcmp(path, "/") != 0){
+		int tamano = 0;
+	  char copia[strlen(path)];
+	  strcpy(copia, path);
+	  char copia1[strlen(path)];
+	  strcpy(copia1, path);
+		//Especificamos como separadores el espacio y el \n
+		char *ptr = strtok(copia, "/");
+		tamano = strlen(ptr);
+	  while((tamano <= 32) && (strcmp(copia, "") != 0)){
+	    //printf("i: %d \n", i);
+	    //printf("ptr: %s\n", ptr);
+	    //printf("copia: %s\n", copia);
+	    //printf("tamaño: %d\n", tamano);
+	    memcpy(copia1, copia1 + strlen(ptr) + 1, strlen(copia1) - strlen(ptr));
+	    //printf("copia1: %s\n", copia1);
+	    strcpy(copia,copia1);
+	    if(strcmp(copia, "") != 0) {
+				ptr = strtok(copia, "/");
+				tamano = strlen(ptr);
+			}
+	    //printf("copia: %s\n", copia);
+		}
+		if (tamano > 32){
+	    return -1;
+		}
+	}
+
+
 	return 0;
 }
 
@@ -228,13 +257,11 @@ void trocearRuta(char *path, char *resul, char *profundidadSuperior)
 	strcpy(copia, path);
 	//Especificamos como separadores el espacio y el \n
 	char *ptr = strtok(copia, "/");
-	if(strlen(ptr) > TAMANO_NOMBRE_FICHERO){
-		strcpy(resul, "MAL");
-	}else{
-		//Eliminamos un nivel de profundidad de la ruta
-		memcpy(resul, path + strlen(ptr) + 1, strlen(path) - strlen(ptr));
-		strcpy(profundidadSuperior, ptr);
-	}
+
+	//Eliminamos un nivel de profundidad de la ruta
+	memcpy(resul, path + strlen(ptr) + 1, strlen(path) - strlen(ptr));
+	strcpy(profundidadSuperior, ptr);
+
 }
 
 int lsDirAuxiliar(char* path, int indice, int listaInodos[12], char listaNombres[12][33]){
@@ -262,10 +289,12 @@ int lsDirAuxiliar(char* path, int indice, int listaInodos[12], char listaNombres
 	char *profundidadSuperior = memoria(TAMANO_NOMBRE_FICHERO + 1);
 	char *resul = memoria(strlen(path));
 	trocearRuta(path, resul, profundidadSuperior);
-
-	if(strcmp(resul, "MAL")== 0) return -2;
+	printf("Resul: %s\n",resul );
+	//if(strcmp(resul, "MAL")== 0) return -2;
 	char rutaCorta[strlen(path)];
 	strcpy(rutaCorta, resul);
+	printf("Ruta: %s\n",rutaCorta);
+	printf("profundidadSuperior: %s\n", profundidadSuperior );
 	free(resul);
 	for(int i = 0; i < 12; i++){
 		if(strcmp(listaNombres[i], profundidadSuperior) == 0){
@@ -326,9 +355,8 @@ void infoFichero(char *path, char *dirSuperior, int *indicePadre, int *indice){
 	if (strlen(dirSuperior) == 0)
 		strcpy(dirSuperior, "/");
 
-	if (resul == -2){
-		*indicePadre = -1;
-	} else if (resul == -1) {
+	if (resul == -1) {
+		//Si es -2 tambien esta el inodo del ~directorio
 		// No existe el hijo, pero comprobamos si existe el padre
 		*indice = -1;
 		resul = lsDirAuxiliar(dirSuperior, 0, inodosDirectorio, nombresDirectorio);
@@ -385,7 +413,8 @@ int crearFichero(char *path, int tipo){
 		}
 	}
 	free(dirSuperiorAux);
-
+	//printf("%d\n", inodoPadre);
+	//printf("%d\n", inodo);
 	if (inodoPadre < 0) {
 		traza("[ERROR] Ruta invalida.\n");
 		return -2;
@@ -515,7 +544,8 @@ int eliminarFichero(char *path, int tipo) {
 	int inodoPadre, inodo;
 	infoFichero(path, dirSuperior, &inodoPadre, &inodo);
 	free(dirSuperior);
-
+	//printf("Inodo Padre %d\n",inodoPadre) ;
+	//printf("Inodo %d\n",inodo) ;
 	if (inodoPadre < 0) {
 		traza("[ERROR] Ruta invalida.\n");
 		return -2;
@@ -546,6 +576,7 @@ int eliminarFichero(char *path, int tipo) {
 			strcat(ruta, path);
 			strcat(ruta, "/");
 			strcat(ruta, nombresDirectorio[i]);
+			//printf("%s\n", ruta );
 			retRM = eliminarFichero(ruta, inodosMemoria[inodosDirectorio[i]].inodo->tipo);
 			free(ruta);
 			if (retRM) {
@@ -695,7 +726,7 @@ int mkFS(long deviceSize)
 	//Creacion de las estructuras estáticas de disco
 	mapaBitsInodos = memoria(sizeof(struct mapaBitsInodos));
 	mapaBitsBloquesDatos = memoria(sizeof(struct mapaBitsBloquesDatos));
-
+	//printf("-%d-\n", (int)NUM_PALABRAS);
 	// sizeof(struct inodo) * MAX_FICHEROS cabe en un bloque
 	inodosDisco = memoria(BLOCK_SIZE);
 	for (int i=0; i < MAX_FICHEROS; i++) {
@@ -1222,6 +1253,10 @@ int balloc()
 			//Para indicar que esta en uso le asignamos valor
 			set_bit(&mapaBitsBloquesDatos->mapa[a], b);
 			bloqueModificado(BLOQUE_BITS_DATOS);
+			if(i > superBloque->primerBloqueDatos){
+				traza("[ERROR] No se ha encontrado un bloque libre, disco lleno\n");
+				return -1;
+			}
 			return i + superBloque->primerBloqueDatos;
 		}
 	}
