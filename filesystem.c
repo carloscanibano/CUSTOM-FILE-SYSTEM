@@ -57,18 +57,12 @@ int comprobarRuta(char *path) {
 		char *ptr = strtok(copia, "/");
 		tamano = strlen(ptr);
 	  while((tamano <= 32) && (strcmp(copia, "") != 0)){
-	    //printf("i: %d \n", i);
-	    //printf("ptr: %s\n", ptr);
-	    //printf("copia: %s\n", copia);
-	    //printf("tamaño: %d\n", tamano);
 	    memcpy(copia1, copia1 + strlen(ptr) + 1, strlen(copia1) - strlen(ptr));
-	    //printf("copia1: %s\n", copia1);
 	    strcpy(copia,copia1);
 	    if(strcmp(copia, "") != 0) {
 				ptr = strtok(copia, "/");
 				tamano = strlen(ptr);
 			}
-	    //printf("copia: %s\n", copia);
 		}
 		if (tamano > 32){
 	    return -1;
@@ -289,12 +283,9 @@ int lsDirAuxiliar(char* path, int indice, int listaInodos[12], char listaNombres
 	char *profundidadSuperior = memoria(TAMANO_NOMBRE_FICHERO + 1);
 	char *resul = memoria(strlen(path));
 	trocearRuta(path, resul, profundidadSuperior);
-	printf("Resul: %s\n",resul );
 	//if(strcmp(resul, "MAL")== 0) return -2;
 	char rutaCorta[strlen(path)];
 	strcpy(rutaCorta, resul);
-	printf("Ruta: %s\n",rutaCorta);
-	printf("profundidadSuperior: %s\n", profundidadSuperior );
 	free(resul);
 	for(int i = 0; i < 12; i++){
 		if(strcmp(listaNombres[i], profundidadSuperior) == 0){
@@ -413,8 +404,6 @@ int crearFichero(char *path, int tipo){
 		}
 	}
 	free(dirSuperiorAux);
-	//printf("%d\n", inodoPadre);
-	//printf("%d\n", inodo);
 	if (inodoPadre < 0) {
 		traza("[ERROR] Ruta invalida.\n");
 		return -2;
