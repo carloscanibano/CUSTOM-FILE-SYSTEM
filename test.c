@@ -525,16 +525,20 @@ void testParticion() {// Se necesita el disk.dat con 40 bloques
 	}
 }
 
-int main()
-{
-	testParticion();
-	/*printf("Makeo\n");if (mk()==-1) return -1;
+int testComprobarPersistenciaMetadatos() {// Se necesita el disk.dat con 40 bloques
+	printf("Makeo\n");if (mk()==-1) return -1;
+	printf("Monto\n");if (montar()==-1) return -1;
+	printf("Desmonto\n");if (desmontar()==-1) return -1;
 
 	printf("Monto\n");if (montar()==-1) return -1;
+	printf("Desmonto\n");if (desmontar()==-1) return -1;
 
-	printf("estructuraPrueba\n");if (estructuraPrueba()==-1) return -1;
+	return 0;
+}
 
-	printf("Desmonto\n");if (desmontar()==-1) return -1;*/
+int main()
+{
+	testComprobarPersistenciaMetadatos();
 
 	return 0;
 }

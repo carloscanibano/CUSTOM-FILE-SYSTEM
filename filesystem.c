@@ -745,6 +745,11 @@ int mountFS(void)
 {
 	if (sincronizarMemoria() == -1) return -1;
 
+	if (superBloque->numeroMagico != NUM_MAGICO) {
+		traza("[ERROR] Es necesario hacer un mkFS\n");
+		return -1;
+	}
+
 	// Creamos los inodos de memoria
 	inodosMemoria = memoria((sizeof(struct inodoMemoria) * superBloque->numeroInodos));
 	#ifdef DEBUGB
@@ -787,6 +792,13 @@ int unmountFS(void)
 	free(inodosDisco);
 	free(inodosMemoria);
 	free(mapaSync);
+
+	//Ponemos punteros a NULL
+	superBloque = NULL;
+	mapas = NULL;
+	inodosDisco = NULL;
+	inodosMemoria = NULL;
+	mapaSync = NULL;
 
 	return 0;
 }
