@@ -909,6 +909,7 @@ int closeFile(int fileDescriptor)
 	}
 
 	inodosMemoria[inodo].estado = CERRADO;
+	estadoFicheros[fileDescriptor] = 0;
 
 	return 0;
 }
@@ -1048,7 +1049,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	if (inodo->posicion < inodo->inodo->tamano) {
 		int aux = (inodo->inodo->tamano - inodo->posicion);
 		if (numBytes > aux) {
-			inodo->inodo->tamano += aux;
+			inodo->inodo->tamano += numBytes - aux;
 		}
 	} else {
 		inodo->inodo->tamano += numBytes;
