@@ -486,18 +486,55 @@ int crearMuchosArchivos() {
 
 }
 
+void testParticion() {// Se necesita el disk.dat con 40 bloques
+	ret = mkFS(50 * BLOCK_SIZE);
+	if (ret != 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS con mas bloques que el archivo (debe ser FAILED) ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+	} else {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS con mas bloques que el archivo (debe ser FAILED) ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	}
+
+	ret = mkFS(40 * BLOCK_SIZE);
+	if (ret != 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS con los mismos bloques que el archivo (debe ser SUCCESS) ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+	} else {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS con los mismos bloques que el archivo (debe ser SUCCESS) ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	}
+
+	ret = mkFS(30 * BLOCK_SIZE);
+	if (ret != 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS con menos bloques que el archivo, particion (debe ser SUCCESS) ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+	} else {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS con menos bloques que el archivo, particion (debe ser SUCCESS) ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	}
+
+	ret = mountFS();
+	if (ret != 0)
+	{
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mountFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+	} else {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mountFS ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	}
+
+	ret = unmountFS();
+	if (ret != 0)
+	{
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST unmountFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+	} else {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST unmountFS ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	}
+}
+
 int main()
 {
-
-	printf("Makeo\n");if (mk()==-1) return -1;
+	testParticion();
+	/*printf("Makeo\n");if (mk()==-1) return -1;
 
 	printf("Monto\n");if (montar()==-1) return -1;
 
-	//printf("estructuraPrueba\n");if (estructuraPrueba()==-1) return -1;
+	printf("estructuraPrueba\n");if (estructuraPrueba()==-1) return -1;
 
-	printf("crearMuchosArchivos devuelve %d (debe ser -1 porque intenta crear 60 cosas)\n", crearMuchosArchivos());
-
-	printf("Desmonto\n");if (desmontar()==-1) return -1;
+	printf("Desmonto\n");if (desmontar()==-1) return -1;*/
 
 	return 0;
 }

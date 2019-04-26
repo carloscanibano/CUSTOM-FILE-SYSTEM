@@ -649,7 +649,7 @@ int comprobarFichero(long deviceSize) {
 	fseek(fp, 0L, SEEK_END);
 	int sz = ftell(fp);
 
-	if (sz != deviceSize) {
+	if (sz < deviceSize) {
 		fclose(fp);
 		return -2;
 	}
@@ -677,7 +677,7 @@ int mkFS(long deviceSize)
 		traza("[ERROR] El archivo no existe\n");
 		return -1;
 	} else if (archivo == -2) {
-		traza("[ERROR] El archivo no tiene el tamaño del parametro de mkFS\n");
+		traza("[ERROR] El archivo no tiene el tamaño necesario para crear una particion\n");
 		return -1;
 	}
 
