@@ -23,7 +23,7 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
 #define PROFUNDIDAD_MAXIMA 3
 #define MIN_TAMANO_DISCO 50*1024// 50 KiB
 #define MAX_TAMANO_DISCO 10*1024*1024// 10 MiB
-#define NUM_MAGICO 0xAAFF8023// TO-DO
+#define NUM_MAGICO 0x11f24a97// Suma de los 3 NIAS (301091479)
 //Numeros de bloque correspondientes al diseno
 #define BLOQUE_SUPERBLOQUE 0
 #define BLOQUE_BITS_INODOS 1
