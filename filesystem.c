@@ -24,6 +24,8 @@ unsigned int estadoFicheros[MAX_FICHEROS];
 // Para saber si es necesario guardar en disco tenemos un mapa de bits, 1 significa que esta desactualizado
 bits *mapaSync = NULL;
 
+char montado = 0;
+
 void traza(char *str){
 	#ifdef DEBUG
 		printf("%s", str);
@@ -530,8 +532,7 @@ int eliminarFichero(char *path, int tipo) {
 	int inodoPadre, inodo;
 	infoFichero(path, dirSuperior, &inodoPadre, &inodo);
 	free(dirSuperior);
-	//printf("Inodo Padre %d\n",inodoPadre) ;
-	//printf("Inodo %d\n",inodo) ;
+
 	if (inodoPadre < 0) {
 		traza("[ERROR] Ruta invalida.\n");
 		return -2;
@@ -771,6 +772,8 @@ int mountFS(void)
 	// Preparamos el estado de los ficheros
 	bzero(estadoFicheros, sizeof(unsigned int) * superBloque->numeroInodos);
 
+	montado = 1;
+
 	return 0;
 }
 
@@ -800,6 +803,8 @@ int unmountFS(void)
 	inodosMemoria = NULL;
 	mapaSync = NULL;
 
+	montado = 0;
+
 	return 0;
 }
 
@@ -809,6 +814,11 @@ int unmountFS(void)
  */
 int createFile(char *path)
 {
+	if (!montado) {
+		traza("[ERROR] Sistema de ficheros no montado.\n");
+		return -2;
+	}
+
 	return crearFichero(path, FICHERO);
 }
 
@@ -818,6 +828,11 @@ int createFile(char *path)
  */
 int removeFile(char *path)
 {
+	if (!montado) {
+		traza("[ERROR] Sistema de ficheros no montado.\n");
+		return -2;
+	}
+
 	int ret = eliminarFichero(path, FICHERO);
 	if (ret < -2) ret = -2;
 	return ret;
@@ -829,6 +844,11 @@ int removeFile(char *path)
  */
 int openFile(char *path)
 {
+	if (!montado) {
+		traza("[ERROR] Sistema de ficheros no montado.\n");
+		return -2;
+	}
+
 	if (comprobarRuta(path) < 0) {
 		return -2;
 	}
@@ -885,6 +905,11 @@ int openFile(char *path)
  */
 int closeFile(int fileDescriptor)
 {
+	if (!montado) {
+		traza("[ERROR] Sistema de ficheros no montado.\n");
+		return -1;
+	}
+
 	if (fileDescriptor < 0 || fileDescriptor >= MAX_FICHEROS){
 		#ifdef DEBUG
 			printf("[ERROR] No se puede cerrar el fichero %d. Descriptor no valido\n", fileDescriptor);
@@ -920,6 +945,11 @@ int closeFile(int fileDescriptor)
  */
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
+	if (!montado) {
+		traza("[ERROR] Sistema de ficheros no montado.\n");
+		return -1;
+	}
+
 	//Comprobar errores
 	if(numBytes < 0){
 		traza("[ERROR] Numero de bytes a leer fuera de limites\n");
@@ -935,7 +965,7 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 	struct inodoMemoria *inodo = &inodosMemoria[estadoFicheros[fileDescriptor]];
 
 	//Posicion a partir de la cual tenemos que leer
-	if (inodo->posicion >= BLOCK_SIZE){
+	if (inodo->posicion >= BLOCK_SIZE || inodo->posicion == inodo->inodo->tamano){
 		return 0;
 	}
 
@@ -984,6 +1014,11 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int writeFile(int fileDescriptor, void *buffer, int numBytes)
 {
+	if (!montado) {
+		traza("[ERROR] Sistema de ficheros no montado.\n");
+		return -1;
+	}
+
 	//Comprobar errores
 	if(numBytes < 0){
 		traza("[ERROR] Numero de bytes a escribir fuera de limites\n");
@@ -1082,6 +1117,11 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int lseekFile(int fileDescriptor, long offset, int whence)
 {
+	if (!montado) {
+		traza("[ERROR] Sistema de ficheros no montado.\n");
+		return -1;
+	}
+
 	if (fileDescriptor >= MAX_FICHEROS|| fileDescriptor < 0){
 		traza("[ERROR] No se puede modificar el puntero de busqueda. Descriptor de fichero invalido\n");
 		return -1;
@@ -1123,6 +1163,11 @@ int lseekFile(int fileDescriptor, long offset, int whence)
  */
 int mkDir(char *path)
 {
+	if (!montado) {
+		traza("[ERROR] Sistema de ficheros no montado.\n");
+		return -2;
+	}
+
 	return crearFichero(path, DIRECTORIO);
 }
 
@@ -1132,6 +1177,11 @@ int mkDir(char *path)
  */
 int rmDir(char *path)
 {
+	if (!montado) {
+		traza("[ERROR] Sistema de ficheros no montado.\n");
+		return -2;
+	}
+
 	int ret = eliminarFichero(path, DIRECTORIO);
 	if (ret < -2) ret = -2;
 	return ret;
@@ -1143,6 +1193,11 @@ int rmDir(char *path)
  */
 int lsDir(char *path, int inodesDir[10], char namesDir[10][33])
 {
+	if (!montado) {
+		traza("[ERROR] Sistema de ficheros no montado.\n");
+		return -2;
+	}
+
 	if (comprobarRuta(path) < 0) {
 		return -2;
 	}
@@ -1157,8 +1212,10 @@ int lsDir(char *path, int inodesDir[10], char namesDir[10][33])
 	for(int i = 2; i < 12; i++){
 		inodesDir[i-2]=inodos[i];
 		strcpy(namesDir[i-2], nombres[i]);
-		if(inodos[i] != -1)
-			printf("%d %s\n", inodos[i], nombres[i]);
+		#ifdef DEBUG
+			if(inodos[i] != -1)
+				printf("%d %s\n", inodos[i], nombres[i]);
+		#endif
 	}
 	return numeroElementos;
 }

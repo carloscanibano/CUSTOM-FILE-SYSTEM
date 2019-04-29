@@ -10,10 +10,16 @@
 #define ANSI_COLOR_GREEN "\x1b[32m"
 #define ANSI_COLOR_BLUE "\x1b[34m"
 
-#define N_BLOCKS 25					  // Number of blocks in the device
+#define N_BLOCKS 50					  // Number of blocks in the device
 #define DEV_SIZE N_BLOCKS * BLOCK_SIZE // Device size, in bytes
 
 int ret;
+
+void * mem(size_t size){
+	void *ptr = malloc(size);
+	bzero(ptr, size);
+	return ptr;
+}
 
 int mk() {
 	ret = mkFS(DEV_SIZE);
@@ -54,34 +60,17 @@ void imprimirBloque(int b) {
 	printf("BLOQUE %d:\n-%s-\n", b, buff);
 	free(buff);
 }
-//FUNCIONA!
-int crearArchivos() {
-	for(int i = 0; i < 15; i++){
-		char buffer[128];
-		sprintf(buffer, "%s%d", "/fichero", i);
-		printf("Creo el archivo %s\n", buffer);
-		ret = createFile(buffer);
-		if (ret != 0){
-			fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-			return -1;
-		}
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	}
-	return 0;
-
-}
 
 int estructuraPrueba(){
 /*
-Ojo que al tener el mapa de bit en el mismo bloque, el bloque es 1 menos
-/ (0,4)
-	a (1,5)
-		aa (2,6)
-			aaa (4,8)
-			aaf (5,9)
-		af (3,7)
-	b (6,10)
-	f (7,11)
+/ (0,3)
+	a (1,4)
+		aa (2,5)
+			aaa (4,7)
+			aaf (5,8)
+		af (3,6)
+	b (6,9)
+	f (7,10)
 */
 	ret=mkDir("/a");
 	if (ret != 0) {
@@ -131,60 +120,32 @@ Ojo que al tener el mapa de bit en el mismo bloque, el bloque es 1 menos
 }
 
 int testEliminar() {
-	//char *arr;
+	char *arr;
 
-	/*arr="/a";// Funciona
+	arr="/a";
 	printf("Eliminar %s (recursivo)\n", arr);
 	ret=rmDir(arr);
-	imprimirBloque(5);*/
-
-	/*imprimirBloque(4);
-	arr="/f";
-	ret=removeFile(arr);// Funciona
-	if (ret < 0){
-		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST removeFile ", arr, ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST removeFile ", arr, ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);
-	imprimirBloque(4);
-	crearArchivo(arr);
-	imprimirBloque(4);*/
-
-	/*arr="/f";
-	ret=rmDir(arr);// Funciona, no se puede borrar un directorio que sea fichero
-	if (ret < 0){
-		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);*/
-
-	/*arr="/a";
-	ret=rmDir(arr);// Funciona, no se puede borrar porque tiene contenido
-	if (ret < 0){
-		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);*/
-
-	/*imprimirBloque(6);
-	arr="/a/aa/aaa";
-	ret=rmDir(arr);// Funciona
 	if (ret < 0){
 		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
 		return -1;
 	}
 	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);
-	imprimirBloque(6);*/
 
-	/*arr="/b/a";
-	ret=rmDir(arr);// Funciona
+	arr="/f";
+	ret=removeFile(arr);
+	if (ret < 0){
+		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST removeFile ", arr, ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST removeFile ", arr, ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);
+
+	arr="/no_existe";
+	ret=rmDir(arr);
 	if (ret < 0){
 		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);*/
-
-	//imprimirBloque(4);
+	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);
 
 	return 0;
 }
@@ -203,167 +164,40 @@ int crearProfuncidadCuatro() {
 		return -1;
 	}
 	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaa/aaaa ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-imprimirBloque(8);
+
 	return 0;
 }
 
-int leerFichero(int fd){
-	int bytesLeidos, bytesLeer = 5;
-	char buferLectura[5];
-	bytesLeidos = readFile(fd, buferLectura, bytesLeer);
-	if (bytesLeidos < 0){
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST readFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST readFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	return bytesLeidos;
-}
-
-int escribirFichero(int fd){
-	int bytesEscritos, bytesEscribir = 10;
-	char buferEscritura[11];
-	strcpy(buferEscritura, "nardonardo");
-	bytesEscritos = writeFile(fd, buferEscritura, bytesEscribir);
-	if (bytesEscritos == 0){
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST writeFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST writeFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	return bytesEscritos;
-}
-
-int listarDirectorio(char *path){
-	int numeroElementos;
-	int inodosDirectorio[10];
-	char nombresDirectorio[10][33];
-	numeroElementos = lsDir(path, inodosDirectorio, nombresDirectorio);
-	printf("Numero de elementos del directorio: %d\n\n", numeroElementos);
-	/*int i;
-	for(i = 0; i < 10; i++){
-		if(inodosDirectorio[i] == -1){
-			break;
-		}
-		printf("%d %s\n", inodosDirectorio[i], nombresDirectorio[i]);
-	}*/
-	if (numeroElementos < 0){
-		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST lsDir ", path, ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return numeroElementos;
-	}
-	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST lsDir ", path, ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	return numeroElementos;
-}
-
-int testsLseek() {
-	printf("\n\n\n-----------Comienzo testsLseek-----------\n");
+int testsAbrirCerrar() {
 	char *file="/f";
+	int fd;
 
-	int b=11;
-	printf("Relleno el bloque %d con numeros\n\n", b);
-	char buff[BLOCK_SIZE], c = '0', c2 = '9';
-	for(int i = 0; i <= BLOCK_SIZE; ++i) {
-		buff[i]=c;
-		c++;
-		if (c==(c2+1))
-			c = '0';
-	}
-	if(bwrite(DEVICE_IMAGE, b, buff) == -1){
-		printf("[ERROR] al escribir\n");
+	fd=openFile(file);
+	if (fd < 0){
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST openFile ", ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
 		return -1;
 	}
-	bzero(buff, BLOCK_SIZE);
-
-	printf("Abriendo '%s'\n", file);
-	int fd=openFile(file);
-	if (fd < 0) {
-		printf("[ERROR] al abrir\n");
-		return -1;
-	}
-	printf("Abierto con fd=%d\n", fd);
-	printf("\n");
-
-	ret=lseekFile(fd, 2048, FS_SEEK_END);
-	printf("lseekFile=%d\n", ret);
-
-	printf("\n");
-	fd=closeFile(fd);
-	if (fd < 0) {
-		printf("[ERROR] al cerrar\n");
-		return -1;
-	}
-	printf("Cerrado con resul=%d\n", fd);
-
-	printf("-----------Termino testsLseek-----------\n\n\n");
-	return 0;
-}
-
-void * mem(size_t size){
-	void *ptr = malloc(size);
-	bzero(ptr, size);
-	return ptr;
-}
-
-int testsLeer() {
-	printf("\n\n\n-----------Comienzo testsLeer-----------\n");
-	char *file="/f";
-	int aux, numBytes;
-	char *buff;
-
-	aux=11;
-	printf("Relleno el bloque %d con numeros\n\n", aux);
-	buff = mem(BLOCK_SIZE);
-	char c = '0', c2 = '9';
-	for(int i = 0; i < 10; ++i) {
-		buff[i]=c++;
-		if (c > c2) c = '0';
-	}
-	//printf("Escrita la prueba buff='%s'\n", buff);
-	if(bwrite(DEVICE_IMAGE, aux, buff) == -1){
-		printf("[ERROR] al escribir\n");
-		return -1;
-	}
-	free(buff);
-
-	printf("Abriendo '%s'\n", file);
-	int fd=openFile(file);
-	if (fd < 0) {
-		printf("[ERROR] al abrir\n");
-		return -1;
-	}
-	printf("Abierto con fd=%d\n\n", fd);
-
-	aux = 2047;
-	buff = mem(aux);
-	numBytes=readFile(fd, buff, aux);
-	printf("Quiero leer numBytes=%d, leo numBytes=%d:\nContenido del buff resul:\n-", aux, numBytes);
-	//printf("'%s'\n", buff);// No se puede hacer porque el ultimo caracter leido no sera un \0
-	for (int i = 0; i < numBytes; ++i)
-		printf("%c", buff[i]);
-	printf("-\n\n\n\n");
-	free(buff);
-
-	aux = 1;
-	buff = mem(aux);
-	numBytes=readFile(fd, buff, aux);
-	printf("Quiero leer numBytes=%d, leo numBytes=%d:\nContenido del buff resul:\n-", aux, numBytes);
-	//printf("'%s'\n", buff);// No se puede hacer porque el ultimo caracter leido no sera un \0
-	for (int i = 0; i < numBytes; ++i)
-		printf("%c", buff[i]);
-	printf("-\n\n\n\n");
-	free(buff);
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST openFile ", ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);
 
 	fd=closeFile(fd);
-	if (fd < 0) {
-		printf("[ERROR] al cerrar\n");
+	if (fd < 0){
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST closeFile ", ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
 		return -1;
 	}
-	printf("Fichero cerrado con resul=%d\n", fd);
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST closeFile ", ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);
 
-	printf("-----------Termino testsLeer-----------\n\n\n");
+	file="/b";
+	fd=openFile(file);
+	if (fd < 0){
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST openFile ", ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST openFile ", ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);
+
 	return 0;
 }
 
 int testsEscribir() {
-	printf("\n\n\n-----------Comienzo testsEscribir-----------\n");
 	char *file="/f";
 	int aux, numBytes;
 	char *buff;
@@ -374,22 +208,18 @@ int testsEscribir() {
 		buff[i]=c++;
 		if (c > c2) c = '0';
 	}
-	/*printf("Relleno el buff para escribir con:\n-");
-	for (int i = 0; i < BLOCK_SIZE; ++i)
-		printf("%c", buffEscribir[i]);
-	printf("-\n");*/
+	#ifdef DEBUG
+		printf("Relleno el buff para escribir con:\n-");
+		for (int i = 0; i < BLOCK_SIZE; ++i)
+			printf("%c", buff[i]);
+		printf("-\n");
+	#endif
 
-	printf("Abriendo '%s'\n", file);
 	int fd=openFile(file);
 	if (fd < 0) {
 		printf("[ERROR] al abrir\n");
 		return -1;
 	}
-	printf("Abierto con fd=%d\n\n", fd);
-
-	/*aux = 3000;
-	numBytes=writeFile(fd, buff, aux);
-	printf("Quiero escribir numBytes=%d, escribo numBytes=%d:\n\n\n", aux, numBytes);*/
 
 	aux = 2000;
 	numBytes=writeFile(fd, buff, aux);
@@ -399,12 +229,21 @@ int testsEscribir() {
 	numBytes=writeFile(fd, buff, aux);
 	printf("Quiero escribir numBytes=%d, escribo numBytes=%d:\n\n\n", aux, numBytes);
 
+	printf("Me posiciono en el principio\n");
 	lseekFile(fd, 0, FS_SEEK_BEGIN);
 	for(int i = 0; i < BLOCK_SIZE; ++i)
 		buff[i]='0';
 	aux = 10;
 	numBytes=writeFile(fd, buff, aux);
 	printf("Quiero escribir numBytes=%d, escribo numBytes=%d:\n\n\n", aux, numBytes);
+
+	lseekFile(fd, 0, FS_SEEK_BEGIN);
+	bzero(buff, BLOCK_SIZE);
+	numBytes=readFile(fd, buff, BLOCK_SIZE);
+	printf("Quiero leer numBytes=%d, leo numBytes=%d:\nContenido del buff resul:", aux/2, numBytes);
+	for (int i = 0; i < numBytes; ++i)
+		printf("%c", buff[i]);
+	printf("-\n");
 
 	free(buff);
 
@@ -413,16 +252,14 @@ int testsEscribir() {
 		printf("[ERROR] al cerrar\n");
 		return -1;
 	}
-	printf("Fichero cerrado con resul=%d\n", fd);
 
-	printf("-----------Termino testsEscribir-----------\n\n\n");
 	return 0;
 }
 
-// Se escribe X/2 A's en el archivo, lseek al principio y leer X, deberia leer solo X/2
-int lecturaConPocoTamano() {
+// Se escribe 50 A's en el archivo, lseek al principio y leer 25x3, deberia leer solo 50
+int lecturaPocoTamano() {
 	char *file="/f";
-	int aux = 100, numBytes;
+	int aux = 50, numBytes;
 	char *buff = mem(aux);
 
 	for(int i = 0; i < aux; ++i)
@@ -434,20 +271,22 @@ int lecturaConPocoTamano() {
 		printf("[ERROR] al abrir\n");
 		return -1;
 	}
-	printf("Abierto con fd=%d\n\n", fd);
 
-	numBytes=writeFile(fd, buff, aux/2);
+	numBytes=writeFile(fd, buff, aux);
 	printf("Quiero escribir numBytes=%d, escribo numBytes=%d:\n", aux, numBytes);
 
+	printf("Me posiciono en el principio\n");
 	lseekFile(fd, 0, FS_SEEK_BEGIN);
 
-	buff = mem(aux);
-	bzero(buff, aux);
-	numBytes=readFile(fd, buff, aux);
-	printf("Quiero leer numBytes=%d, leo numBytes=%d:\nContenido del buff resul:\n-", aux, numBytes);
-	for (int i = 0; i < numBytes; ++i)
-		printf("%c", buff[i]);
-	printf("-\n\n\n\n");
+	for (int i = 0; i < 3; ++i) {
+		bzero(buff, aux);
+		numBytes=readFile(fd, buff, aux/2);
+		printf("Quiero leer numBytes=%d, leo numBytes=%d:\nContenido del buff resul:", aux/2, numBytes);
+		for (int i = 0; i < numBytes; ++i)
+			printf("%c", buff[i]);
+		printf("-\n");
+		printf("\n");
+	}
 	free(buff);
 
 	fd=closeFile(fd);
@@ -455,16 +294,16 @@ int lecturaConPocoTamano() {
 		printf("[ERROR] al cerrar\n");
 		return -1;
 	}
-	printf("Fichero cerrado con resul=%d\n", fd);
 
 	return 0;
 }
 
-// Crea 6 directorios y cada uno tiene 10 archivos
+// Crea 4 directorios y cada uno tiene 10 archivos. 40 - (/+ 4 dirs) = 35 (debe de dar error el quinto del ultimo directorio)
 int crearMuchosArchivos() {
 	char buffer[128], dir[64];
-	for(int i = 0; i < 6; i++){
+	for(int i = 0; i < 4; i++){
 		sprintf(dir, "%s%d", "/dir", i);
+		printf("Creo el directorio %s\n", dir);
 		ret = mkDir(dir);
 		if (ret != 0){
 			fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkDir ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
@@ -526,7 +365,7 @@ void testParticion() {// Se necesita el disk.dat con 40 bloques
 }
 
 int testComprobarPersistenciaMetadatos() {// Se necesita el disk.dat con 40 bloques
-	printf("Makeo\n");if (mk()==-1) return -1;
+	printf("Make\n");if (mk()==-1) return -1;
 	printf("Monto\n");if (montar()==-1) return -1;
 	printf("Desmonto\n");if (desmontar()==-1) return -1;
 
@@ -538,16 +377,10 @@ int testComprobarPersistenciaMetadatos() {// Se necesita el disk.dat con 40 bloq
 
 int main()
 {
-	testComprobarPersistenciaMetadatos();
+	printf("Make\n");if (mk()==-1) return -1;
+	printf("Monto\n");if (montar()==-1) return -1;
+	estructuraPrueba();
+	printf("Desmonto\n");if (desmontar()==-1) return -1;
 
 	return 0;
 }
-
-/*Comandos para probar:
-ls -las
-rm disk.dat
-./create_disk 25
-rm disco.dat
-dd if=disk.dat ibs=1024 skip=0 count=2048 of=disco.dat
-head -c 2048 disk.dat
-*/
