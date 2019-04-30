@@ -10,48 +10,21 @@
 #define ANSI_COLOR_GREEN "\x1b[32m"
 #define ANSI_COLOR_BLUE "\x1b[34m"
 
-#define N_BLOCKS 50					  // Number of blocks in the device
-#define DEV_SIZE N_BLOCKS * BLOCK_SIZE // Device size, in bytes
+// README
+// Todas las funciones tienen un comentario para saber como tiene que estar el entorno (cuantos bloques del disk.dat
+//		necesita o si es necesario la estructura basica [comentada en la memoria]), porque no es posible con solo un test.c
+// Las pruebas sirven para saber si una funcion hace bien algo, algunas tienen como objetivo que falle
+// Si cualquier funcion devuelve un error por consola se mostrara FAILED en color rojo, si es correcta CORRECT en verde
+// Si una prueba tiene que ser correcta y devuelve error, se imprimira "La prueba ha fallado"
+// Si una prueba tiene que ser incorrecta y no devuelve error, se imprimira el string del siguiente define
+#define PRUEBA_FALLO "La prueba ha fallado\n"
 
-int ret;
-
+// Auxiliares
 void * mem(size_t size){
 	void *ptr = malloc(size);
 	bzero(ptr, size);
 	return ptr;
 }
-
-int mk() {
-	ret = mkFS(DEV_SIZE);
-	if (ret != 0)
-	{
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	return 0;
-}
-int montar() {
-	ret = mountFS();
-	if (ret != 0)
-	{
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mountFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mountFS ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	return 0;
-}
-int desmontar() {
-	ret = unmountFS();
-	if (ret != 0)
-	{
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST unmountFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST unmountFS ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	return 0;
-}
-
 void imprimirBloque(int b) {
 	char *buff = malloc(BLOCK_SIZE);
 	bzero(buff, BLOCK_SIZE);
@@ -61,142 +34,207 @@ void imprimirBloque(int b) {
 	free(buff);
 }
 
+// Imprime en rojo si exito<=0
+int trazaTest(int exito, char *funcion, char *arg) {
+	if (exito < 0) {
+		fprintf(stdout, "%s%s %s(%s)%s %s%s", ANSI_COLOR_BLUE, "TEST", funcion, arg, ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	} else {
+		fprintf(stdout, "%s%s %s(%s)%s %s%s", ANSI_COLOR_BLUE, "TEST", funcion, arg, ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+		return 0;
+	}
+}
+
+int mk() {
+	if (trazaTest(mkFS(40 * BLOCK_SIZE), "mkFS", "40 bloques") < 0) {
+		printf(PRUEBA_FALLO);
+		return -1;
+	}
+	return 0;
+}
+int montar() {
+	if (trazaTest(mountFS(), "mountFS", "") < 0) {
+		printf(PRUEBA_FALLO);
+		return -1;
+	}
+	return 0;
+}
+int desmontar() {
+	if (trazaTest(unmountFS(), "unmountFS", "") < 0) {
+		printf(PRUEBA_FALLO);
+		return -1;
+	}
+	return 0;
+}
+
+int testCreacion() {
+	mk();
+	montar();
+	desmontar();
+	return 0;
+}
+
+// Se necesita el disk.dat con 40 bloques
+int testParticiones() {
+	if (trazaTest(mkFS(50 * BLOCK_SIZE), "mkFS", "50 bloques") > 0) {
+		printf(PRUEBA_FALLO);
+		return -1;
+	}
+
+	if (trazaTest(mkFS(40 * BLOCK_SIZE), "mkFS", "40 bloques") < 0) {
+		printf(PRUEBA_FALLO);
+		return -1;
+	}
+
+	if (trazaTest(mkFS(30 * BLOCK_SIZE), "mkFS", "30 bloques") < 0) {
+		printf(PRUEBA_FALLO);
+		return -1;
+	}
+
+	montar();
+	desmontar();
+
+	return 0;
+}
+
+// Se necesita el disk.dat con 50 bloques
 int estructuraPrueba(){
-/*
-/ (0,3)
-	a (1,4)
-		aa (2,5)
-			aaa (4,7)
-			aaf (5,8)
-		af (3,6)
-	b (6,9)
-	f (7,10)
-*/
-	ret=mkDir("/a");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+	/*
+	/ (0,3)
+		a (1,4)
+			aa (2,5)
+				aaa (4,7)
+				aaf (5,8)
+			af (3,6)
+		b (6,9)
+		f (7,10)
+	 */
+	if (trazaTest(mkDir("/a"), "mkDir", "/a") < 0) {
+		printf(PRUEBA_FALLO);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	ret=mkDir("/a/aa");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	ret=createFile("/a/af");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/af ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/af ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	ret=mkDir("/a/aa/aaa");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaa ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaa ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	ret=createFile("/a/aa/aaf");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaf ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaf ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 
-	ret=mkDir("/b");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /b ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+	if (trazaTest(mkDir("/a/aa"), "mkDir", "/a/aa") < 0) {
+		printf(PRUEBA_FALLO);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /b ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 
-	ret=createFile("/f");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /f ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+	if (trazaTest(mkDir("/a/af"), "mkDir", "/a/af") < 0) {
+		printf(PRUEBA_FALLO);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /f ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+
+	if (trazaTest(mkDir("/a/aa/aaa"), "mkDir", "/a/aa/aaa") < 0) {
+		printf(PRUEBA_FALLO);
+		return -1;
+	}
+
+	if (trazaTest(createFile("/a/aa/aaf"), "createFile", "/a/aa/aaf") < 0) {
+		printf(PRUEBA_FALLO);
+		return -1;
+	}
+
+	if (trazaTest(mkDir("/b"), "mkDir", "/b") < 0) {
+		printf(PRUEBA_FALLO);
+		return -1;
+	}
+
+	if (trazaTest(createFile("/f"), "createFile", "/f") < 0) {
+		printf(PRUEBA_FALLO);
+		return -1;
+	}
+
 	return 0;
 }
 
+// Se necesita el disk.dat con 50 bloques
+// Crea 4 directorios y cada uno tiene 10 archivos. 40 - (/+ 4 dirs) = 35
+// Debe de dar error el sexto del ultimo directorio por superar los 40
+int testMuchosArchivos() {
+	char fichero[128], dir[64];
+
+	for(int i = 1; i <= 4; i++) {
+		sprintf(dir, "%s%d", "/dir", i);
+
+		if (trazaTest(mkDir(dir), "mkDir", dir) < 0) {
+			printf(PRUEBA_FALLO);
+			return -1;
+		}
+
+		for(int j = 1; j <= 10; j++) {
+			sprintf(fichero, "%s%s%d", dir, "/f", j);
+
+			if (trazaTest(createFile(fichero), "createFile", fichero) < 0) {
+				printf(PRUEBA_FALLO);
+				return -1;
+			}
+		}
+	}
+
+	return 0;
+}
+
+// Se necesita la estructuraPrueba()
 int testEliminar() {
-	char *arr;
-
-	arr="/a";
-	printf("Eliminar %s (recursivo)\n", arr);
-	ret=rmDir(arr);
-	if (ret < 0){
-		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
+	char *arr="/a";
+	printf("Eliminar %s (recursivo): ", arr);
+	if (trazaTest(rmDir(arr), "rmDir", arr) < 0) {
+		printf(PRUEBA_FALLO);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);
 
-	arr="/f";
-	ret=removeFile(arr);
-	if (ret < 0){
-		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST removeFile ", arr, ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
+	if (trazaTest(rmDir("/f"), "rmDir", "/f") < 0) {
+		printf(PRUEBA_FALLO);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST removeFile ", arr, ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);
 
-	arr="/no_existe";
-	ret=rmDir(arr);
-	if (ret < 0){
-		fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
+	if (trazaTest(rmDir("/no_existe"), "rmDir", "/no_existe") > 0) {
+		printf(PRUEBA_FALLO);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST rmDir ", arr, ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);
 
 	return 0;
 }
 
+// Se necesita la estructuraPrueba()
 int crearProfuncidadCuatro() {
-	ret=createFile("/a/aa/aaa/f");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaa/f ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+	if (trazaTest(createFile("/a/aa/aaa/f"), "createFile", "/a/aa/aaa/f") < 0) {
+		printf(PRUEBA_FALLO);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaa/f ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 
-	ret=mkDir("/a/aa/aaa/aaaa");
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaa/aaaa ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+	if (trazaTest(createFile("/a/aa/aaa/aaaa"), "createFile", "/a/aa/aaa/aaaa") > 0) {
+		printf(PRUEBA_FALLO);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "creo /a/aa/aaa/aaaa ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 
 	return 0;
 }
 
+// Se necesita la estructuraPrueba()
 int testsAbrirCerrar() {
-	char *file="/f";
 	int fd;
 
-	fd=openFile(file);
-	if (fd < 0){
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST openFile ", ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
+	fd = openFile("/f");
+	if (trazaTest(fd, "openFile", "/f") < 0) {
+		printf(PRUEBA_FALLO);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST openFile ", ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);
 
-	fd=closeFile(fd);
-	if (fd < 0){
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST closeFile ", ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
+	if (trazaTest(closeFile(fd), "closeFile", "") < 0) {
+		printf(PRUEBA_FALLO);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST closeFile ", ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);
 
-	file="/b";
-	fd=openFile(file);
-	if (fd < 0){
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST openFile ", ANSI_COLOR_RED, " FAILED\n", ANSI_COLOR_RESET);
+	if (trazaTest(openFile("/b"), "openFile", "/b") > 0) {
+		printf(PRUEBA_FALLO);
 		return -1;
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST openFile ", ANSI_COLOR_GREEN, " SUCCESS\n", ANSI_COLOR_RESET);
 
 	return 0;
 }
 
+// Se necesita la estructuraPrueba()
 int testsEscribir() {
 	char *file="/f";
 	int aux, numBytes;
@@ -256,6 +294,7 @@ int testsEscribir() {
 	return 0;
 }
 
+// Se necesita la estructuraPrueba()
 // Se escribe 50 A's en el archivo, lseek al principio y leer 25x3, deberia leer solo 50
 int lecturaPocoTamano() {
 	char *file="/f";
@@ -298,89 +337,61 @@ int lecturaPocoTamano() {
 	return 0;
 }
 
-// Crea 4 directorios y cada uno tiene 10 archivos. 40 - (/+ 4 dirs) = 35 (debe de dar error el quinto del ultimo directorio)
-int crearMuchosArchivos() {
-	char buffer[128], dir[64];
-	for(int i = 0; i < 4; i++){
-		sprintf(dir, "%s%d", "/dir", i);
-		printf("Creo el directorio %s\n", dir);
-		ret = mkDir(dir);
-		if (ret != 0){
-			fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkDir ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-			return -1;
-		}
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkDir ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-		for(int j = 0; j < 10; j++){
-			sprintf(buffer, "%s%s%d", dir, "/f", j);
-			printf("Creo el archivo %s\n", buffer);
-			ret = createFile(buffer);
-			if (ret != 0){
-				fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-				return -1;
-			}
-			fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-		}
+int testListar(){
+	int inodosDirectorio[10];
+	char nombresDirectorio[10][33];
+	int numeroElementos;
+
+
+	numeroElementos = lsDir("/", inodosDirectorio, nombresDirectorio);
+	if (trazaTest(numeroElementos, "lsDir", "/") < 0) {
+		printf(PRUEBA_FALLO);
+		return -1;
 	}
+	for(int i = 0; i < numeroElementos; i++)
+		printf("%d %s\n", inodosDirectorio[i], nombresDirectorio[i]);
+
+
+	numeroElementos = lsDir("/f", inodosDirectorio, nombresDirectorio);
+	if (trazaTest(numeroElementos, "lsDir", "/f") > 0) {
+		printf(PRUEBA_FALLO);
+		return -1;
+	}
+
+
+	numeroElementos = lsDir("/no_existe", inodosDirectorio, nombresDirectorio);
+	if (trazaTest(numeroElementos, "lsDir", "/no_existe") > 0) {
+		printf(PRUEBA_FALLO);
+		return -1;
+	}
+
 	return 0;
-
 }
 
-void testParticion() {// Se necesita el disk.dat con 40 bloques
-	ret = mkFS(50 * BLOCK_SIZE);
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS con mas bloques que el archivo (debe ser FAILED) ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-	} else {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS con mas bloques que el archivo (debe ser FAILED) ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+// Se necesita el disk.dat con >=25 bloques
+int testMetadatos() {
+	if (trazaTest(mkFS(40 * BLOCK_SIZE), "mkFS", "40 bloques") < 0) {
+		printf(PRUEBA_FALLO);
+		return -1;
 	}
+	montar();
+	desmontar();
 
-	ret = mkFS(40 * BLOCK_SIZE);
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS con los mismos bloques que el archivo (debe ser SUCCESS) ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-	} else {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS con los mismos bloques que el archivo (debe ser SUCCESS) ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	}
-
-	ret = mkFS(30 * BLOCK_SIZE);
-	if (ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS con menos bloques que el archivo, particion (debe ser SUCCESS) ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-	} else {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS con menos bloques que el archivo, particion (debe ser SUCCESS) ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	}
-
-	ret = mountFS();
-	if (ret != 0)
-	{
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mountFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-	} else {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mountFS ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	}
-
-	ret = unmountFS();
-	if (ret != 0)
-	{
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST unmountFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-	} else {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST unmountFS ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	}
-}
-
-int testComprobarPersistenciaMetadatos() {// Se necesita el disk.dat con 40 bloques
-	printf("Make\n");if (mk()==-1) return -1;
-	printf("Monto\n");if (montar()==-1) return -1;
-	printf("Desmonto\n");if (desmontar()==-1) return -1;
-
-	printf("Monto\n");if (montar()==-1) return -1;
-	printf("Desmonto\n");if (desmontar()==-1) return -1;
+	montar();
+	desmontar();
 
 	return 0;
 }
 
 int main()
 {
-	printf("Make\n");if (mk()==-1) return -1;
-	printf("Monto\n");if (montar()==-1) return -1;
+	if (mk() < 0) return -1;
+	if (montar() < 0) return -1;
+	printf("\n");
 	estructuraPrueba();
-	printf("Desmonto\n");if (desmontar()==-1) return -1;
+	printf("\n");
+	testListar();
+	if (desmontar() < 0) return -1;
 
 	return 0;
 }

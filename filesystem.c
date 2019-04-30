@@ -471,10 +471,13 @@ int crearFichero(char *path, int tipo){
 			return -2;
 		}
 
-		int c=0;
-		for (int i = 0; i < BLOCK_SIZE; i++)
-			if (bufferLectura[i] == '\n')
-				c++;
+		int c = 0;
+		for (int i = 0; i < BLOCK_SIZE; i++) {
+			if (bufferLectura[i] == 0) break;
+			if (bufferLectura[i] == '\n') c++;
+		}
+
+		// Comprobamos el maximo de archivos permitido
 		if (c >= (CONTENIDO_MAX_DIRECTORIO + 2)) {
 			#ifdef DEBUG
 				printf("[ERROR] El padre no puede contener mas de %d ficheros\n", CONTENIDO_MAX_DIRECTORIO);
@@ -482,6 +485,8 @@ int crearFichero(char *path, int tipo){
 			free(bufferLectura);
 			return -2;
 		}
+
+		// Anadimos la entrada
 		sprintf(buff, FORMATO_LINEA_DIRECTORIO, inodo, nombre);
 		memcpy(bufferLectura + inodosMemoria[inodoPadre].inodo->tamano, buff, sizeof(buff));
 		if(bwrite(DEVICE_IMAGE, inodosMemoria[inodoPadre].inodo->bloqueDirecto, bufferLectura) == -1){
@@ -489,6 +494,7 @@ int crearFichero(char *path, int tipo){
 			free(bufferLectura);
 			return -1;
 		}
+
 		inodosMemoria[inodoPadre].inodo->tamano += strlen(buff);
 	}
 
