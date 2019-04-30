@@ -472,7 +472,7 @@ int crearFichero(char *path, int tipo){
 		}
 
 		int c = 0;
-		for (int i = 0; i < BLOCK_SIZE; i++) {
+		for (int i = 0; i < inodosMemoria[inodoPadre].inodo->tamano; i++) {
 			if (bufferLectura[i] == 0) break;
 			if (bufferLectura[i] == '\n') c++;
 		}

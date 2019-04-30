@@ -148,8 +148,8 @@ int estructuraPrueba(){
 }
 
 // Se necesita el disk.dat con 50 bloques
-// Crea 4 directorios y cada uno tiene 10 archivos. 40 - (/+ 4 dirs) = 35
-// Debe de dar error el sexto del ultimo directorio por superar los 40
+// Crea 4 directorios y cada uno tiene 10 archivos.
+// Debe de dar error en el tercer fichero, cuarto directorio
 int testMuchosArchivos() {
 	char fichero[128], dir[64];
 
@@ -390,7 +390,6 @@ int main()
 	printf("\n");
 	estructuraPrueba();
 	printf("\n");
-	testListar();
 	if (desmontar() < 0) return -1;
 
 	return 0;
